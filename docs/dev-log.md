@@ -20,6 +20,11 @@
 - [ ] 向課外活動相關單位確認正式宣傳規定，更新 `04_campus_promotion_guidelines.md`
 - [ ] 進行情境 A、B 實測，記錄時間節省率與幹部評分
 
+## 2026-09-28｜v0.2.0 改用 Gemini
+
+- 新增 `GeminiLLM`，預設供應商改為 Google Gemini（`gemini-flash-latest`），Claude 保留為可選項。
+- CLI 新增 `--provider`，並支援環境變數 `CLUB_AGENT_PROVIDER`、`CLUB_AGENT_MODEL`。
+
 ## 提示詞調校紀錄
 
 | 日期 | Agent | 調整內容 | 原因／觀察 | 結果 |

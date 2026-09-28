@@ -38,9 +38,12 @@
 
 ## 模型呼叫
 
+- 以 `create_llm(provider, model)` 建立；預設 `GeminiLLM`，可切換 `ClaudeLLM`。
+- `GeminiLLM` 將 Pydantic schema 展開成獨立 JSON Schema，透過 `response_json_schema` 要求 Gemini 輸出 JSON，
+  再以 Pydantic 驗證；輸出被截斷、被擋或格式不符時拋出 `LLMError`。
 - `ClaudeLLM` 使用 `client.beta.messages.parse`，搭配 adaptive thinking 與 effort 設定。
-- 啟用伺服器端 refusal fallback（`fallbacks="default"`），請求被安全分類器誤擋時自動改由備援模型處理。
-- `stop_reason` 為 `refusal` 或 `max_tokens` 時拋出 `LLMError`，不會回傳不完整的結果。
+- （Claude）啟用伺服器端 refusal fallback（`fallbacks="default"`），請求被安全分類器誤擋時自動改由備援模型處理。
+- （Claude）`stop_reason` 為 `refusal` 或 `max_tokens` 時拋出 `LLMError`，不會回傳不完整的結果。
 
 ## 擴充到其他營運面向
 

@@ -28,7 +28,7 @@
 
 ```bash
 pip install -e ".[dev]"
-export ANTHROPIC_API_KEY=你的金鑰          # 或使用 `ant auth login`
+export GEMINI_API_KEY=你的金鑰             # 到 Google AI Studio 申請
 
 # 不需 API 金鑰：先看統計與知識庫檢索
 club-agent metrics --posts examples/sample_posts.csv
@@ -93,7 +93,7 @@ src/club_agent/
   metrics.py             社群數據統計
   retriever.py           RAG 檢索（BM25，可替換為向量資料庫）
   knowledge_base/*.md    知識庫（種子資料，請持續擴充）
-  llm.py                 Claude API 呼叫層（結構化輸出）
+  llm.py                 AI 模型呼叫層（Gemini／Claude，可切換）
   personas.py            顧問角色（行銷已開放；公關、財務、組織、營運規劃中）
   evaluation.py          成果評鑑工具
   report.py              Markdown 報告輸出
@@ -114,4 +114,16 @@ tests/                   單元測試（使用假 LLM，不需 API 金鑰）
 pytest
 ```
 
-模型預設為 `claude-opus-5`，可用環境變數 `CLUB_AGENT_MODEL` 或 `--model` 更換。
+## 切換 AI 模型
+
+預設使用 **Google Gemini**（`gemini-flash-latest`），也支援 Anthropic Claude。
+
+| 設定方式 | Gemini（預設） | Claude |
+|---|---|---|
+| 安裝 | `pip install -e .` | `pip install -e ".[claude]"` |
+| 金鑰 | `GEMINI_API_KEY` | `ANTHROPIC_API_KEY` |
+| 指定供應商 | — | `--provider claude` 或 `CLUB_AGENT_PROVIDER=claude` |
+| 預設模型 | `gemini-flash-latest` | `claude-opus-5` |
+
+換模型：`--model gemini-pro-latest` 或設定環境變數 `CLUB_AGENT_MODEL`。
+要新增其他供應商，只需在 `llm.py` 實作 `structured()` 並登錄到 `PROVIDERS`。

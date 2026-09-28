@@ -45,11 +45,11 @@ def _progress(msg: str) -> None:
 
 
 def _workflow(args):
-    from .llm import ClaudeLLM
+    from .llm import create_llm
     from .workflow import MarketingWorkflow
 
     return MarketingWorkflow(
-        llm=ClaudeLLM(model=args.model),
+        llm=create_llm(args.provider, args.model),
         retriever=BM25Retriever.from_directory(args.kb) if args.kb else BM25Retriever.from_directory(),
         max_rounds=getattr(args, "rounds", 3),
         on_progress=_progress,
@@ -123,7 +123,8 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     def llm_opts(p: argparse.ArgumentParser) -> None:
-        p.add_argument("--model", help="Claude 模型 ID（預設讀取 CLUB_AGENT_MODEL 或 claude-opus-5）")
+        p.add_argument("--provider", choices=["gemini", "claude"], help="模型供應商（預設讀取 CLUB_AGENT_PROVIDER，否則為 gemini）")
+        p.add_argument("--model", help="模型 ID（預設讀取 CLUB_AGENT_MODEL；Gemini 為 gemini-flash-latest，Claude 為 claude-opus-5）")
         p.add_argument("--kb", help="自訂知識庫資料夾（預設使用內建知識庫）")
         p.add_argument("--out", default="outputs", help="輸出資料夾")
 
