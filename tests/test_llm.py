@@ -59,3 +59,55 @@ def test_create_llm_selects_provider(monkeypatch):
     assert create_llm("gemini").model == "gemini-pro-latest"
     with pytest.raises(ValueError):
         create_llm("unknown")
+
+
+class FlakyModels:
+    """前 n 次呼叫丟出指定錯誤，之後回傳正常結果；記錄每次使用的模型。"""
+
+    def __init__(self, failures: int, code: int = 503):
+        from google.genai import errors
+
+        self.failures, self.code, self.errors, self.models = failures, code, errors, []
+
+    def generate_content(self, **kwargs):
+        self.models.append(kwargs["model"])
+        if len(self.models) <= self.failures:
+            cls = self.errors.ServerError if self.code >= 500 else self.errors.ClientError
+            raise cls(self.code, {"error": {"code": self.code, "message": "busy", "status": "UNAVAILABLE"}})
+        return FakeModels(json.dumps(CRITIQUE)).generate_content(**kwargs)
+
+
+def _flaky_llm(models, **kw):
+    return GeminiLLM(
+        model="main",
+        client=FakeClient(models),
+        fallback_models=["backup"],
+        retries_per_model=2,
+        notify=lambda _m: None,
+        sleep=lambda _s: None,
+        **kw,
+    )
+
+
+def test_gemini_retries_then_succeeds():
+    models = FlakyModels(failures=2)
+    assert _flaky_llm(models).structured("s", "u", Critique).scores[0].score == 4
+    assert models.models == ["main", "main", "main"]
+
+
+def test_gemini_falls_back_to_backup_model():
+    models = FlakyModels(failures=3)
+    _flaky_llm(models).structured("s", "u", Critique)
+    assert models.models == ["main"] * 3 + ["backup"]
+
+
+def test_gemini_gives_up_with_friendly_error():
+    with pytest.raises(LLMError, match="忙碌"):
+        _flaky_llm(FlakyModels(failures=99)).structured("s", "u", Critique)
+
+
+def test_gemini_non_retryable_error_raises_immediately():
+    models = FlakyModels(failures=99, code=400)
+    with pytest.raises(LLMError, match="400"):
+        _flaky_llm(models).structured("s", "u", Critique)
+    assert models.models == ["main"]

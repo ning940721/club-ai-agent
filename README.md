@@ -108,6 +108,14 @@ tests/                   單元測試（使用假 LLM，不需 API 金鑰）
 建議收錄：社團歷屆高互動貼文（標註互動率）、成功活動的宣傳時程、校內正式宣傳規定。
 也可用 `--kb 資料夾路徑` 指定社團專屬知識庫。
 
+## 常見問題
+
+| 訊息 | 原因與解法 |
+|---|---|
+| 找不到 API 金鑰 | 尚未設定 `GEMINI_API_KEY`。Windows 命令提示字元：`set GEMINI_API_KEY=金鑰`；PowerShell：`$env:GEMINI_API_KEY="金鑰"`；Mac：`export GEMINI_API_KEY="金鑰"`。永久設定可用 `setx GEMINI_API_KEY "金鑰"`（需重開終端機） |
+| 某模型目前忙碌（503／429） | Google 伺服器暫時滿載。程式會自動等待重試，再依序改用備用模型（預設 `gemini-2.5-flash`、`gemini-flash-lite-latest`，可用 `CLUB_AGENT_FALLBACK_MODELS` 修改）。全部失敗時請稍後再試 |
+| 檔案名稱、目錄名稱或磁碟區標籤語法錯誤 | 在「命令提示字元」輸入了 PowerShell 語法，請改用上方對應的寫法 |
+
 ## 開發
 
 ```bash

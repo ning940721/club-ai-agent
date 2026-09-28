@@ -13,7 +13,9 @@
 from __future__ import annotations
 
 import os
-from typing import Protocol, TypeVar
+import sys
+import time
+from typing import Callable, Protocol, TypeVar
 
 from pydantic import BaseModel, ValidationError
 
@@ -24,6 +26,7 @@ DEFAULT_MODELS = {
     "gemini": "gemini-flash-latest",
     "claude": "claude-opus-5",
 }
+DEFAULT_GEMINI_FALLBACKS = ["gemini-2.5-flash", "gemini-flash-lite-latest"]
 
 
 class LLMError(RuntimeError):
@@ -56,20 +59,66 @@ def _model_from_env(provider: str, model: str | None) -> str:
 
 
 class GeminiLLM:
-    """以 Gemini 的 JSON Schema 結構化輸出產生符合 schema 的結果。"""
+    """以 Gemini 的 JSON Schema 結構化輸出產生符合 schema 的結果。
 
-    def __init__(self, model: str | None = None, max_output_tokens: int = 16000, client=None):
+    Gemini 伺服器忙碌（503）或達到速率上限（429）時，會等待後重試；
+    主要模型持續忙碌時，依序改用備用模型（可用 CLUB_AGENT_FALLBACK_MODELS 以逗號分隔指定）。
+    """
+
+    RETRYABLE_CODES = {429, 500, 503, 504}
+
+    def __init__(
+        self,
+        model: str | None = None,
+        max_output_tokens: int = 16000,
+        client=None,
+        fallback_models: list[str] | None = None,
+        retries_per_model: int = 2,
+        retry_wait_seconds: float = 10.0,
+        notify: Callable[[str], None] | None = None,
+        sleep: Callable[[float], None] = time.sleep,
+    ):
         from google import genai
 
         self.model = _model_from_env("gemini", model)
         self.max_output_tokens = max_output_tokens
         self.client = client or genai.Client()
+        if fallback_models is None:
+            env = os.environ.get("CLUB_AGENT_FALLBACK_MODELS")
+            fallback_models = [m.strip() for m in env.split(",") if m.strip()] if env else DEFAULT_GEMINI_FALLBACKS
+        self.fallback_models = [m for m in fallback_models if m != self.model]
+        self.retries_per_model = retries_per_model
+        self.retry_wait_seconds = retry_wait_seconds
+        self.notify = notify or (lambda msg: print(f"… {msg}", file=sys.stderr))
+        self.sleep = sleep
 
     def structured(self, system: str, user: str, output_type: type[T]) -> T:
+        from google.genai import errors
+
+        last_error: Exception | None = None
+        for model in [self.model, *self.fallback_models]:
+            for attempt in range(self.retries_per_model + 1):
+                try:
+                    return self._generate(model, system, user, output_type)
+                except errors.APIError as e:
+                    if e.code not in self.RETRYABLE_CODES:
+                        raise LLMError(f"Gemini API 錯誤（{e.code}）：{e.message}") from e
+                    last_error = e
+                    if attempt < self.retries_per_model:
+                        wait = self.retry_wait_seconds * (attempt + 1)
+                        self.notify(f"{model} 目前忙碌（{e.code}），{wait:.0f} 秒後重試…")
+                        self.sleep(wait)
+            self.notify(f"{model} 持續忙碌，改用備用模型")
+        raise LLMError(
+            "Gemini 伺服器目前忙碌，所有模型都暫時無法使用，請稍後再試"
+            f"（最後錯誤：{getattr(last_error, 'code', '')} {getattr(last_error, 'message', '')}）"
+        )
+
+    def _generate(self, model: str, system: str, user: str, output_type: type[T]) -> T:
         from google.genai import types
 
         response = self.client.models.generate_content(
-            model=self.model,
+            model=model,
             contents=user,
             config=types.GenerateContentConfig(
                 system_instruction=system,

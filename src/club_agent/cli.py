@@ -179,8 +179,17 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> None:
+    from .llm import LLMError
+
     args = build_parser().parse_args(argv)
-    args.func(args)
+    try:
+        args.func(args)
+    except LLMError as e:
+        sys.exit(f"錯誤：{e}")
+    except ValueError as e:
+        if "API key" in str(e):
+            sys.exit("錯誤：找不到 API 金鑰，請先設定環境變數 GEMINI_API_KEY（詳見 README）")
+        raise
 
 
 if __name__ == "__main__":
