@@ -51,6 +51,17 @@ club-agent campaign \
 
 > `examples/` 內的社團資料與貼文數據皆為**虛構示範資料**，實測時請換成實際社團資料。
 
+## 網頁版
+
+給不熟悉指令的社團幹部使用：上傳 CSV、填活動資訊、按按鈕就能拿到報告，支援手機瀏覽。
+
+```bash
+pip install -r requirements.txt
+streamlit run app.py
+```
+
+免費上線到網路（金鑰不外流、可設使用密碼）的步驟見 **[docs/deploy.md](docs/deploy.md)**。
+
 ## 輸入資料格式
 
 **社團資料**（`club_profile.json`）：`name`、`category`、`positioning`、`target_audience`、`brand_voice`、`platforms`、`monthly_budget_ntd`、`notes`。

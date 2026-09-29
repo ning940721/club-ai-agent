@@ -5,15 +5,20 @@ from __future__ import annotations
 from .schemas import CampaignResult, DiagnosisReport
 
 
+def _cell(text: object) -> str:
+    """表格儲存格內不能有換行或直線符號，否則 Markdown 表格會跑版。"""
+    return str(text).replace("|", "｜").replace("\r", " ").replace("\n", " ")
+
+
 def diagnosis_markdown(club_name: str, report: DiagnosisReport) -> str:
     out = [f"# {club_name} 社群數據診斷報告", "", "## 總結", report.summary, "", "## 流量瓶頸與宣傳盲點"]
     for f in report.bottlenecks:
         out.append(f"- **{f.title}**（影響：{f.impact}）— {f.evidence}")
     out += ["", "## 受眾洞察", *[f"- {i}" for i in report.audience_insights]]
     out += ["", "## 建議貼文主題分配", "| 主題 | 占比 | 理由 |", "|---|---|---|"]
-    out += [f"| {t.topic} | {t.share_percent}% | {t.rationale} |" for t in report.topic_allocation]
+    out += [f"| {_cell(t.topic)} | {t.share_percent}% | {_cell(t.rationale)} |" for t in report.topic_allocation]
     out += ["", "## 最佳發文時機", "| 平台 | 星期 | 時段 | 理由 |", "|---|---|---|---|"]
-    out += [f"| {s.platform} | {s.weekday} | {s.time_range} | {s.rationale} |" for s in report.best_posting_times]
+    out += [f"| {_cell(s.platform)} | {_cell(s.weekday)} | {_cell(s.time_range)} | {_cell(s.rationale)} |" for s in report.best_posting_times]
     out += ["", "## 優先改善行動", *[f"{i}. {a}" for i, a in enumerate(report.priority_actions, 1)]]
     if report.data_gaps:
         out += ["", "## 數據限制", *[f"- {g}" for g in report.data_gaps]]
@@ -38,8 +43,8 @@ def campaign_markdown(result: CampaignResult) -> str:
     ]
     for ph in p.timeline:
         out.append(
-            f"| {ph.phase} | D{ph.start_offset_days:+d} ~ D{ph.end_offset_days:+d} | {ph.goal} "
-            f"| {'<br>'.join(ph.tasks)} | {ph.owner} |"
+            f"| {_cell(ph.phase)} | D{ph.start_offset_days:+d} ~ D{ph.end_offset_days:+d} | {_cell(ph.goal)} "
+            f"| {_cell('；'.join(ph.tasks))} | {_cell(ph.owner)} |"
         )
     out += ["", "## 各平台貼文"]
     for i, post in enumerate(p.posts, 1):

@@ -28,3 +28,11 @@ def test_weekday_and_hour_buckets():
     assert {g.key for g in s.by_weekday} == {"週一", "週二"}
     assert {g.key for g in s.by_hour} == {"深夜 21-06", "早上 06-12"}
     assert s.reach_trend_percent is None
+
+
+def test_parse_big5_csv_from_excel():
+    from club_agent.metrics import decode_csv_bytes, parse_posts_csv
+
+    text = "date,platform,post_type,topic,reach,likes\n2026-09-01,Instagram,輪播,活動宣傳,100,10\n,,,,,\n"
+    posts = parse_posts_csv(decode_csv_bytes(text.encode("cp950")))
+    assert len(posts) == 1 and posts[0].topic == "活動宣傳"

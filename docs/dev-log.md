@@ -25,6 +25,13 @@
 - 新增 `GeminiLLM`，預設供應商改為 Google Gemini（`gemini-flash-latest`），Claude 保留為可選項。
 - CLI 新增 `--provider`，並支援環境變數 `CLUB_AGENT_PROVIDER`、`CLUB_AGENT_MODEL`。
 
+## 2026-09-29｜v0.3.0 網頁版
+
+- 新增 Streamlit 網頁介面（`app.py`）：社團資料、數據診斷、活動宣傳企劃、使用說明與 CSV 範本下載。
+- 金鑰與使用密碼放在 Streamlit Secrets；每位使用者有執行次數上限。
+- 支援 Excel 在 Windows 另存的 Big5 編碼 CSV。
+- 第一次以 Gemini 在本機成功跑完數據診斷。
+
 ## 提示詞調校紀錄
 
 | 日期 | Agent | 調整內容 | 原因／觀察 | 結果 |

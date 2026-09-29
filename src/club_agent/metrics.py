@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import csv
+import io
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import date
@@ -18,16 +19,29 @@ from .schemas import PostRecord
 WEEKDAYS_ZH = ["週一", "週二", "週三", "週四", "週五", "週六", "週日"]
 
 
-def load_posts_csv(path: str | Path) -> list[PostRecord]:
-    """讀取貼文數據 CSV。欄位名稱需與 PostRecord 相同，缺少的數字欄位視為 0。"""
+def parse_posts_csv(text: str) -> list[PostRecord]:
+    """解析貼文數據 CSV 文字。欄位名稱需與 PostRecord 相同，缺少的數字欄位視為 0。"""
     posts: list[PostRecord] = []
-    with open(path, newline="", encoding="utf-8-sig") as f:
-        for row in csv.DictReader(f):
-            cleaned = {k.strip(): (v or "").strip() for k, v in row.items() if k}
-            for key in ("reach", "likes", "comments", "shares", "saves", "followers"):
-                cleaned[key] = int(float(cleaned.get(key) or 0))
-            posts.append(PostRecord(**cleaned))
+    for row in csv.DictReader(io.StringIO(text.lstrip("\ufeff"))):
+        cleaned = {k.strip(): (v or "").strip() for k, v in row.items() if k}
+        if not any(cleaned.values()):
+            continue
+        for key in ("reach", "likes", "comments", "shares", "saves", "followers"):
+            cleaned[key] = int(float(cleaned.get(key) or 0))
+        posts.append(PostRecord(**cleaned))
     return posts
+
+
+def decode_csv_bytes(data: bytes) -> str:
+    """Excel 在 Windows 存的中文 CSV 常是 Big5（cp950），UTF-8 解不開時改用 cp950。"""
+    try:
+        return data.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        return data.decode("cp950")
+
+
+def load_posts_csv(path: str | Path) -> list[PostRecord]:
+    return parse_posts_csv(decode_csv_bytes(Path(path).read_bytes()))
 
 
 def interactions(p: PostRecord) -> int:

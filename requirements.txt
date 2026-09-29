@@ -1,0 +1,5 @@
+# 網頁版（Streamlit Community Cloud）所需套件
+streamlit>=1.40
+google-genai>=2.0
+pydantic>=2.7
+pandas
