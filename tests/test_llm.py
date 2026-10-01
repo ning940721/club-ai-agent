@@ -42,7 +42,7 @@ def test_gemini_structured_parses_output():
 
 
 def test_gemini_errors():
-    with pytest.raises(LLMError, match="max_output_tokens"):
+    with pytest.raises(LLMError, match="截斷"):
         GeminiLLM(client=FakeClient(FakeModels('{"scores":', finish="MAX_TOKENS"))).structured("s", "u", Critique)
     with pytest.raises(LLMError, match="格式"):
         GeminiLLM(client=FakeClient(FakeModels('{"foo": 1}'))).structured("s", "u", Critique)
@@ -64,16 +64,18 @@ def test_create_llm_selects_provider(monkeypatch):
 class FlakyModels:
     """前 n 次呼叫丟出指定錯誤，之後回傳正常結果；記錄每次使用的模型。"""
 
-    def __init__(self, failures: int, code: int = 503):
+    def __init__(self, failures: int, code: int = 503, quota_id: str = ""):
         from google.genai import errors
 
         self.failures, self.code, self.errors, self.models = failures, code, errors, []
+        self.quota_id = quota_id
 
     def generate_content(self, **kwargs):
         self.models.append(kwargs["model"])
         if len(self.models) <= self.failures:
             cls = self.errors.ServerError if self.code >= 500 else self.errors.ClientError
-            raise cls(self.code, {"error": {"code": self.code, "message": "busy", "status": "UNAVAILABLE"}})
+            details = [{"violations": [{"quotaId": self.quota_id}]}, {"retryDelay": "7s"}] if self.quota_id else []
+            raise cls(self.code, {"error": {"code": self.code, "message": "busy", "status": "UNAVAILABLE", "details": details}})
         return FakeModels(json.dumps(CRITIQUE)).generate_content(**kwargs)
 
 
@@ -111,3 +113,25 @@ def test_gemini_non_retryable_error_raises_immediately():
     with pytest.raises(LLMError, match="400"):
         _flaky_llm(models).structured("s", "u", Critique)
     assert models.models == ["main"]
+
+
+def test_daily_quota_skips_retries_and_explains():
+    models = FlakyModels(failures=99, code=429, quota_id="GenerateRequestsPerDayPerProjectPerModel-FreeTier")
+    with pytest.raises(LLMError, match="今天的免費額度"):
+        _flaky_llm(models).structured("s", "u", Critique)
+    assert models.models == ["main", "backup"]  # 每個模型只試一次
+
+
+def test_daily_quota_on_main_model_uses_backup():
+    models = FlakyModels(failures=1, code=429, quota_id="GenerateRequestsPerDayPerProjectPerModel-FreeTier")
+    assert _flaky_llm(models).structured("s", "u", Critique).scores[0].score == 4
+    assert models.models == ["main", "backup"]
+
+
+def test_minute_quota_waits_suggested_delay():
+    waits = []
+    models = FlakyModels(failures=99, code=429, quota_id="GenerateRequestsPerMinutePerProjectPerModel-FreeTier")
+    llm = GeminiLLM(model="main", client=FakeClient(models), fallback_models=[], retries_per_model=1, notify=lambda _m: None, sleep=waits.append)
+    with pytest.raises(LLMError, match="每分鐘"):
+        llm.structured("s", "u", Critique)
+    assert waits == [7.0]

@@ -125,6 +125,9 @@ tests/                   單元測試（使用假 LLM，不需 API 金鑰）
 |---|---|
 | 找不到 API 金鑰 | 尚未設定 `GEMINI_API_KEY`。Windows 命令提示字元：`set GEMINI_API_KEY=金鑰`；PowerShell：`$env:GEMINI_API_KEY="金鑰"`；Mac：`export GEMINI_API_KEY="金鑰"`。永久設定可用 `setx GEMINI_API_KEY "金鑰"`（需重開終端機） |
 | 某模型目前忙碌（503／429） | Google 伺服器暫時滿載。程式會自動等待重試，再依序改用備用模型（預設 `gemini-2.5-flash`、`gemini-flash-lite-latest`，可用 `CLUB_AGENT_FALLBACK_MODELS` 修改）。全部失敗時請稍後再試 |
+| 今天的免費額度已經用完 | Gemini 免費版每天有次數上限（每個模型分開計算），程式會先自動換備用模型；全部用完需等隔天，或在 Google AI Studio 開啟付費 |
+| 超過每分鐘的上限 | 短時間呼叫太多次。產生一份宣傳企劃會呼叫 AI 多次，請等 1–2 分鐘再試，或把審查輪數調低 |
+| AI 的回答太長被截斷 | 把活動說明寫精簡一點，或調低審查輪數 |
 | 檔案名稱、目錄名稱或磁碟區標籤語法錯誤 | 在「命令提示字元」輸入了 PowerShell 語法，請改用上方對應的寫法 |
 
 ## 開發

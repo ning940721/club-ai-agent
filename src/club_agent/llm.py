@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import os
+import re
 import sys
 import time
 from typing import Callable, Protocol, TypeVar
@@ -58,6 +59,20 @@ def _model_from_env(provider: str, model: str | None) -> str:
     return model or os.environ.get("CLUB_AGENT_MODEL") or DEFAULT_MODELS[provider]
 
 
+def quota_info(error) -> tuple[str | None, float | None]:
+    """從 429 錯誤判斷是「每日」還是「每分鐘」額度，並取出建議的等待秒數。"""
+    if getattr(error, "code", None) != 429:
+        return None, None
+    text = str(getattr(error, "details", "")) + str(getattr(error, "message", ""))
+    delay = None
+    match = re.search(r"retryDelay'?\"?:\s*'?\"?(\d+(?:\.\d+)?)s", text)
+    if match:
+        delay = float(match.group(1))
+    if re.search(r"PerDay|per day|daily", text, re.IGNORECASE):
+        return "daily", delay
+    return "minute", delay
+
+
 class GeminiLLM:
     """以 Gemini 的 JSON Schema 結構化輸出產生符合 schema 的結果。
 
@@ -70,7 +85,7 @@ class GeminiLLM:
     def __init__(
         self,
         model: str | None = None,
-        max_output_tokens: int = 16000,
+        max_output_tokens: int = 32768,
         client=None,
         fallback_models: list[str] | None = None,
         retries_per_model: int = 2,
@@ -95,8 +110,12 @@ class GeminiLLM:
     def structured(self, system: str, user: str, output_type: type[T]) -> T:
         from google.genai import errors
 
+        hit_daily_quota = hit_minute_quota = False
         last_error: Exception | None = None
-        for model in [self.model, *self.fallback_models]:
+        models = [self.model, *self.fallback_models]
+        for index, model in enumerate(models):
+            if index:
+                self.notify(f"改用備用模型 {model}…")
             for attempt in range(self.retries_per_model + 1):
                 try:
                     return self._generate(model, system, user, output_type)
@@ -104,15 +123,28 @@ class GeminiLLM:
                     if e.code not in self.RETRYABLE_CODES:
                         raise LLMError(f"Gemini API 錯誤（{e.code}）：{e.message}") from e
                     last_error = e
+                    kind, delay = quota_info(e)
+                    if kind == "daily":
+                        # 每日額度是「每個模型」分開計算，重試同一個模型沒用，直接換下一個
+                        hit_daily_quota = True
+                        self.notify(f"{model} 今天的免費額度已用完")
+                        break
+                    if kind == "minute":
+                        hit_minute_quota = True
                     if attempt < self.retries_per_model:
-                        wait = self.retry_wait_seconds * (attempt + 1)
-                        self.notify(f"{model} 目前忙碌（{e.code}），{wait:.0f} 秒後重試…")
+                        wait = min(delay or self.retry_wait_seconds * (attempt + 1), 65)
+                        reason = "每分鐘使用次數已達上限" if kind == "minute" else f"目前忙碌（{e.code}）"
+                        self.notify(f"{model} {reason}，{wait:.0f} 秒後重試…")
                         self.sleep(wait)
-            self.notify(f"{model} 持續忙碌，改用備用模型")
-        raise LLMError(
-            "Gemini 伺服器目前忙碌，所有模型都暫時無法使用，請稍後再試"
-            f"（最後錯誤：{getattr(last_error, 'code', '')} {getattr(last_error, 'message', '')}）"
-        )
+        detail = f"（最後錯誤：{getattr(last_error, 'code', '')} {getattr(last_error, 'message', '')}）"
+        if hit_daily_quota:
+            raise LLMError(
+                "Gemini 今天的免費額度已經用完（每天有次數上限）。請明天再試，"
+                "或到 Google AI Studio 為這組金鑰開啟付費方案。" + detail
+            )
+        if hit_minute_quota:
+            raise LLMError("短時間內呼叫太多次，超過 Gemini 免費版每分鐘的上限，請等 1–2 分鐘再試。" + detail)
+        raise LLMError("Gemini 伺服器目前忙碌，所有模型都暫時無法使用，請稍後再試。" + detail)
 
     def _generate(self, model: str, system: str, user: str, output_type: type[T]) -> T:
         from google.genai import types
@@ -131,7 +163,7 @@ class GeminiLLM:
         candidate = response.candidates[0] if response.candidates else None
         finish = candidate.finish_reason if candidate else None
         if finish == types.FinishReason.MAX_TOKENS:
-            raise LLMError("輸出超過 max_output_tokens 上限，請調高上限或縮小需求範圍")
+            raise LLMError("AI 的回答太長被截斷了，請把需求寫得精簡一點、或把審查輪數調低後再試一次")
         if not response.text:
             feedback = response.prompt_feedback.block_reason if response.prompt_feedback else None
             raise LLMError(f"模型沒有回傳內容（finish_reason={finish}, block_reason={feedback}）")
