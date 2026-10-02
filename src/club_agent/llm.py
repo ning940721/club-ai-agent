@@ -27,7 +27,8 @@ DEFAULT_MODELS = {
     "gemini": "gemini-flash-latest",
     "claude": "claude-opus-5",
 }
-DEFAULT_GEMINI_FALLBACKS = ["gemini-2.5-flash", "gemini-flash-lite-latest"]
+# 備用模型依序嘗試；已下架或不開放的模型（404）會自動略過
+DEFAULT_GEMINI_FALLBACKS = ["gemini-3.8-flash", "gemini-flash-lite-latest", "gemini-pro-latest"]
 
 
 class LLMError(RuntimeError):
@@ -111,6 +112,7 @@ class GeminiLLM:
         from google.genai import errors
 
         hit_daily_quota = hit_minute_quota = False
+        unavailable: list[str] = []
         last_error: Exception | None = None
         models = [self.model, *self.fallback_models]
         for index, model in enumerate(models):
@@ -120,6 +122,11 @@ class GeminiLLM:
                 try:
                     return self._generate(model, system, user, output_type)
                 except errors.APIError as e:
+                    if e.code == 404:
+                        # 模型已下架或不開放給這組金鑰，換下一個模型
+                        unavailable.append(model)
+                        self.notify(f"{model} 目前無法使用，略過")
+                        break
                     if e.code not in self.RETRYABLE_CODES:
                         raise LLMError(f"Gemini API 錯誤（{e.code}）：{e.message}") from e
                     last_error = e
@@ -136,6 +143,11 @@ class GeminiLLM:
                         reason = "每分鐘使用次數已達上限" if kind == "minute" else f"目前忙碌（{e.code}）"
                         self.notify(f"{model} {reason}，{wait:.0f} 秒後重試…")
                         self.sleep(wait)
+        if len(unavailable) == len(models):
+            raise LLMError(
+                f"設定的 Gemini 模型都無法使用（{', '.join(unavailable)}），"
+                "請用 GEMINI_MODEL 改成 Google AI Studio 目前提供的模型名稱"
+            )
         detail = f"（最後錯誤：{getattr(last_error, 'code', '')} {getattr(last_error, 'message', '')}）"
         if hit_daily_quota:
             raise LLMError(

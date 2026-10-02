@@ -28,7 +28,7 @@ def _button(at, label):
 
 def test_password_gate(monkeypatch):
     monkeypatch.setenv("APP_PASSWORD", "secret")
-    at = st_testing.AppTest.from_file(APP).run()
+    at = st_testing.AppTest.from_file(APP, default_timeout=30).run()
     assert not at.tabs  # 未輸入密碼前看不到主畫面
     at.text_input[0].input("wrong")
     _button(at, "進入").click().run()

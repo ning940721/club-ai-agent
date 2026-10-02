@@ -135,3 +135,35 @@ def test_minute_quota_waits_suggested_delay():
     with pytest.raises(LLMError, match="每分鐘"):
         llm.structured("s", "u", Critique)
     assert waits == [7.0]
+
+
+class ModelSpecificErrors:
+    """依模型名稱回傳指定錯誤碼，未指定的模型正常回應。"""
+
+    def __init__(self, codes: dict[str, int]):
+        from google.genai import errors
+
+        self.codes, self.errors, self.models = codes, errors, []
+
+    def generate_content(self, **kwargs):
+        model = kwargs["model"]
+        self.models.append(model)
+        if model in self.codes:
+            code = self.codes[model]
+            cls = self.errors.ServerError if code >= 500 else self.errors.ClientError
+            raise cls(code, {"error": {"code": code, "message": "x", "status": "X"}})
+        return FakeModels(json.dumps(CRITIQUE)).generate_content(**kwargs)
+
+
+def test_unavailable_fallback_model_is_skipped():
+    models = ModelSpecificErrors({"main": 503, "retired": 404})
+    llm = GeminiLLM(model="main", client=FakeClient(models), fallback_models=["retired", "good"], retries_per_model=1, notify=lambda _m: None, sleep=lambda _s: None)
+    assert llm.structured("s", "u", Critique).scores[0].score == 4
+    assert models.models == ["main", "main", "retired", "good"]
+
+
+def test_all_models_unavailable_explains_setting():
+    models = ModelSpecificErrors({"a": 404, "b": 404})
+    llm = GeminiLLM(model="a", client=FakeClient(models), fallback_models=["b"], notify=lambda _m: None, sleep=lambda _s: None)
+    with pytest.raises(LLMError, match="GEMINI_MODEL"):
+        llm.structured("s", "u", Critique)
