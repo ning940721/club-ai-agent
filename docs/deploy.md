@@ -10,14 +10,18 @@ git pull
 pip install -r requirements.txt
 ```
 
-把 `.streamlit/secrets.toml.example` 複製一份，改名為 `.streamlit/secrets.toml`，填入你的金鑰與自訂密碼
+把 `.streamlit/secrets.toml.example` 複製一份，改名為 `.streamlit/secrets.toml`，填入你的金鑰
 （這個檔案已設定不會上傳到 GitHub）。然後執行：
 
 ```bash
 streamlit run app.py
 ```
 
-瀏覽器會自動打開 `http://localhost:8501`。
+瀏覽器會自動打開 `http://localhost:8501`。第一次使用請到「建立社團帳號」建立帳號。
+社團帳號與紀錄會存在專案資料夾的 `data/` 裡（不會上傳到 GitHub）。
+
+> ⚠️ **目前資料存在主機的檔案裡**：在自己電腦上沒問題；但 Streamlit Community Cloud 重新啟動或更新時會清空檔案，
+> 社團帳號和紀錄會消失。正式給多個社團使用前，需要完成「第二階段：改用線上資料庫」。
 
 ## 二、部署到網路上
 
@@ -31,7 +35,7 @@ streamlit run app.py
    - **Secrets** 欄位貼上（換成你的金鑰與密碼）：
      ```toml
      GEMINI_API_KEY = "你的 Gemini 金鑰"
-     APP_PASSWORD = "給幹部的使用密碼"
+     SIGNUP_CODE = "給參與實測社團的邀請碼"
      ```
 4. 按「Deploy」，等幾分鐘安裝完成，就會得到網址。
 
@@ -41,10 +45,10 @@ streamlit run app.py
 ## 三、之後怎麼更新
 
 程式推送到 GitHub 的同一個分支後，Streamlit 會自動重新部署，不用重做上面的步驟。
-要換金鑰或密碼：到 App 的「Settings → Secrets」修改後儲存。
+要換金鑰或邀請碼：到 App 的「Settings → Secrets」修改後儲存。
 
 ## 保護你的額度
 
-- **使用密碼**（`APP_PASSWORD`）：只把密碼給參與實測的社團幹部。沒設定時任何知道網址的人都能使用。
+- **邀請碼**（`SIGNUP_CODE`）：建立新社團帳號時必須輸入，只給參與實測的社團。沒設定時任何知道網址的人都能自行建立帳號並使用。
 - **次數上限**（`MAX_RUNS_PER_SESSION`，預設 20）：每位使用者開啟網頁後最多能執行幾次 AI 分析。
 - 定期到 Google AI Studio 查看用量；發現異常時立刻在 AI Studio 刪除舊金鑰、建立新金鑰，再更新 Secrets。

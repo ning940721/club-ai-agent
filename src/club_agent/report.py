@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .schemas import CampaignResult, DiagnosisReport
+from .schemas import Advice, CampaignResult, DiagnosisReport
 
 
 def _cell(text: object) -> str:
@@ -76,4 +76,23 @@ def campaign_markdown(result: CampaignResult) -> str:
             out += ["", "修改要求：", *[f"- {r}" for r in c.revision_requests]]
     if p.references_used:
         out += ["", "## 參考知識庫", *[f"- {r}" for r in p.references_used]]
+    return "\n".join(out) + "\n"
+
+
+def advice_markdown(department_name: str, question: str, advice: Advice) -> str:
+    out = [f"# {department_name}部門顧問建議", "", f"> **問題：** {question}", "", "## 建議摘要", advice.summary]
+    if advice.steps:
+        out += ["", "## 行動步驟", "| # | 步驟 | 做法 | 負責 | 時程 |", "|---|---|---|---|---|"]
+        out += [
+            f"| {i} | {_cell(s.step)} | {_cell(s.detail)} | {_cell(s.owner)} | {_cell(s.timing)} |"
+            for i, s in enumerate(advice.steps, 1)
+        ]
+    for d in advice.deliverables:
+        out += ["", f"## 📄 {d.title}", "", d.content]
+    if advice.coordination:
+        out += ["", "## 跨部門協作", *[f"- **{c.department}**：{c.what}" for c in advice.coordination]]
+    if advice.risks:
+        out += ["", "## 注意事項", *[f"- {r}" for r in advice.risks]]
+    if advice.info_needed:
+        out += ["", "## 補充這些資訊，建議會更精準", *[f"- {i}" for i in advice.info_needed]]
     return "\n".join(out) + "\n"

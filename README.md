@@ -53,7 +53,12 @@ club-agent campaign \
 
 ## 網頁版
 
-給不熟悉指令的社團幹部使用：上傳 CSV、填活動資訊、按按鈕就能拿到報告，支援手機瀏覽。
+給不熟悉指令的社團幹部使用，支援手機瀏覽：
+
+- **社團帳號：** 每個社團一組帳號，第一次建立時填好社團資料，之後登入直接帶入。
+- **選擇部門：** 行銷、公關、財務、活動、場地、會議記錄、課程。行銷為正式版（另有數據診斷、宣傳企劃工具），其他部門為測試版。
+- **部門顧問：** 輸入問題，取得行動步驟、可直接使用的文件模板與跨部門協作建議。
+- **社團動態：** 各部門的提問與成果都會存下來，全社團看得到彼此在做什麼，顧問回答時也會參考其他部門近況。
 
 ```bash
 pip install -r requirements.txt
@@ -103,9 +108,12 @@ src/club_agent/
   workflow.py            多 Agent 協同流程（撰寫 → 審查 → 修訂迴圈）
   metrics.py             社群數據統計
   retriever.py           RAG 檢索（BM25，可替換為向量資料庫）
-  knowledge_base/*.md    知識庫（種子資料，請持續擴充）
+  knowledge_base/*.md    行銷知識庫（種子資料，請持續擴充）
+  knowledge_base/departments/*.md  各部門知識庫（種子資料）
   llm.py                 AI 模型呼叫層（Gemini／Claude，可切換）
-  personas.py            顧問角色（行銷已開放；公關、財務、組織、營運規劃中）
+  departments.py         部門定義與各部門顧問角色
+  agents/advisor.py      部門顧問 Agent
+  store.py               社團帳號與紀錄儲存（目前存本機檔案）
   evaluation.py          成果評鑑工具
   report.py              Markdown 報告輸出
   cli.py                 命令列介面

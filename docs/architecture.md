@@ -45,10 +45,23 @@
 - （Claude）啟用伺服器端 refusal fallback（`fallbacks="default"`），請求被安全分類器誤擋時自動改由備援模型處理。
 - （Claude）`stop_reason` 為 `refusal` 或 `max_tokens` 時拋出 `LLMError`，不會回傳不完整的結果。
 
-## 擴充到其他營運面向
+## 多社團與部門顧問（v0.4.0）
 
-`personas.py` 已登錄公關贊助、財務、組織人事、營運統籌等角色。新增模組的步驟：
-1. 在 `schemas.py` 定義該模組的輸入與輸出格式（例如 `SponsorshipProposal`、`BudgetSheet`）。
-2. 在 `agents/` 新增對應 Agent 與 system prompt，沿用「產出 → 審查 → 修訂」流程。
-3. 在 `knowledge_base/` 補上領域知識（公關信範本、預算表範例等）。
-4. 將 persona 設為 `available=True` 並加入 CLI 子命令。
+- `store.py`：`ClubStore` 介面，目前實作 `LocalClubStore`（本機檔案）。每個社團一組帳號，密碼以 PBKDF2 加鹽雜湊保存；
+  紀錄（部門、類型、標題、摘要、完整內容）存在各社團自己的資料夾，彼此隔離。
+- `departments.py`：七個部門（行銷、公關、財務、活動、場地、會議記錄、課程）的顧問角色、專長與範例問題。
+  行銷沿用行銷模組知識庫；其他部門使用 `knowledge_base/departments/<key>.md`，再加上共用的校園規範。
+- `agents/advisor.py`：部門顧問 Agent，輸入社團資料、部門知識庫與「其他部門近期動態」，輸出 `Advice`
+  （摘要、行動步驟、可直接使用的文件模板、跨部門協作、注意事項、需要補充的資訊）。
+- 網頁版登入後選擇部門；所有產出都寫入社團紀錄，「社團動態」頁可看到全社團各部門的提問與成果。
+
+### 下一階段：線上資料庫
+
+實作一個新的 `ClubStore`（例如 Supabase），提供相同的方法（建立帳號、登入驗證、讀寫社團資料與紀錄），
+再在 `app.py` 換掉 `LocalClubStore` 即可，部門顧問與行銷工具都不需修改。
+
+## 新增或深化部門
+
+1. 在 `departments.py` 調整該部門的顧問角色、專長與範例問題；正式版把 `beta` 改為 `False`。
+2. 在 `knowledge_base/departments/` 補充該部門的知識（例如社團歷屆預算表、公關信）。
+3. 需要專屬工具時（像行銷的數據診斷），在 `schemas.py` 定義輸出格式、在 `agents/` 新增 Agent，再加到網頁的部門分頁。

@@ -2,7 +2,6 @@ import pytest
 
 from club_agent.agents import CriticAgent
 from club_agent.metrics import load_posts_csv, summarize
-from club_agent.personas import get_persona
 from club_agent.report import campaign_markdown, diagnosis_markdown
 from club_agent.retriever import BM25Retriever
 from club_agent.schemas import CampaignPlan, Critique, DiagnosisReport
@@ -58,11 +57,3 @@ def test_reports_render(club):
 
     md = campaign_markdown(CampaignResult(plan=make_plan(), critiques=[make_critique([5, 5, 5, 5])], rounds=1, approved=True))
     assert "D-14 ~ D-8" in md and "點主頁連結報名" in md
-
-
-def test_personas():
-    assert get_persona("marketing").available
-    with pytest.raises(NotImplementedError):
-        get_persona("finance")
-    with pytest.raises(ValueError):
-        get_persona("unknown")

@@ -22,3 +22,21 @@ def test_cli_offline_commands(capsys, sample_csv, tmp_path):
     f = tmp_path / "t.jsonl"
     main(["eval", "log", "--club-name", "A", "--task", "x", "--manual", "50", "--ai", "10", "--file", str(f)])
     assert "80%" in capsys.readouterr().out
+
+
+def test_cli_departments_and_ask(capsys, monkeypatch, tmp_path):
+    from club_agent import llm as llm_mod
+    from club_agent.schemas import Advice
+
+    from test_advisor import make_advice
+
+    class Fake:
+        def structured(self, system, user, output_type):
+            assert output_type is Advice
+            return make_advice()
+
+    monkeypatch.setattr(llm_mod, "create_llm", lambda provider=None, model=None: Fake())
+    main(["departments"])
+    assert "會議記錄" in capsys.readouterr().out
+    main(["ask", "--club", "examples/club_profile.json", "--dept", "finance", "--out", str(tmp_path), "預算怎麼分配？"])
+    assert "財務部門顧問建議" in capsys.readouterr().out

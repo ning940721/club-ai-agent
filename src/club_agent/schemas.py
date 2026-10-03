@@ -155,3 +155,34 @@ class CampaignResult(BaseModel):
     critiques: list[Critique]
     rounds: int
     approved: bool
+
+
+# ---------------------------------------------------------------------------
+# 部門顧問輸出
+# ---------------------------------------------------------------------------
+
+
+class ActionStep(BaseModel):
+    step: str = Field(description="步驟名稱")
+    detail: str = Field(description="具體做法")
+    owner: str = Field(description="建議負責的部門或角色")
+    timing: str = Field(description="建議完成時間，如：活動前 3 週、本週內")
+
+
+class Deliverable(BaseModel):
+    title: str = Field(description="文件名稱，如：贊助提案信模板、預算表欄位、會議紀錄格式")
+    content: str = Field(description="可直接複製使用的完整內容（Markdown）")
+
+
+class Coordination(BaseModel):
+    department: str = Field(description="需要協作的部門")
+    what: str = Field(description="需要對方配合或提供的事項")
+
+
+class Advice(BaseModel):
+    summary: str = Field(description="一段話回答使用者的問題與核心建議")
+    steps: list[ActionStep] = Field(description="依先後順序排列的行動步驟")
+    deliverables: list[Deliverable] = Field(description="可直接使用的文件或模板；不需要時可為空")
+    coordination: list[Coordination] = Field(description="需要和其他部門協作的事項；不需要時可為空")
+    risks: list[str] = Field(description="需要注意的風險或常見錯誤")
+    info_needed: list[str] = Field(description="還需要使用者補充、才能給出更精準建議的資訊")

@@ -5,7 +5,8 @@
   club-agent campaign --club examples/club_profile.json --brief "..." [--posts ...]
   club-agent search   "週年活動 宣傳時程"
   club-agent eval log | report | compare
-  club-agent personas
+  club-agent departments
+  club-agent ask --club examples/club_profile.json --dept finance "成果展預算怎麼分配？"
 """
 
 from __future__ import annotations
@@ -18,7 +19,7 @@ from pathlib import Path
 
 from . import evaluation
 from .metrics import load_posts_csv, summarize
-from .personas import PERSONAS
+from .departments import DEPARTMENTS, department_retriever, get_department
 from .report import campaign_markdown, diagnosis_markdown
 from .retriever import BM25Retriever
 from .schemas import ClubProfile
@@ -89,9 +90,24 @@ def cmd_search(args) -> None:
         print(chunk.render(), end="\n\n")
 
 
-def cmd_personas(_args) -> None:
-    for p in PERSONAS.values():
-        print(f"[{'可用' if p.available else '規劃中'}] {p.key:<13} {p.title}：{p.description}")
+def cmd_departments(_args) -> None:
+    for d in DEPARTMENTS.values():
+        print(f"{d.key:<10} {d.label}：{'、'.join(d.focus)}")
+
+
+def cmd_ask(args) -> None:
+    from .agents import DepartmentAdvisor
+    from .llm import create_llm
+    from .report import advice_markdown
+
+    club = _load_club(args.club)
+    dept = get_department(args.dept)
+    _progress(f"{dept.name}顧問思考中…")
+    advice = DepartmentAdvisor(create_llm(args.provider, args.model), department_retriever(dept.key)).run(club, dept, args.question)
+    md = advice_markdown(dept.name, args.question, advice)
+    path = _save(args.out, f"advice-{dept.key}", md, advice.model_dump_json(indent=2))
+    print(md)
+    print(f"已儲存：{path}", file=sys.stderr)
 
 
 def cmd_eval_log(args) -> None:
@@ -154,8 +170,15 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--kb")
     p.set_defaults(func=cmd_search)
 
-    p = sub.add_parser("personas", help="列出顧問角色")
-    p.set_defaults(func=cmd_personas)
+    p = sub.add_parser("departments", help="列出部門")
+    p.set_defaults(func=cmd_departments)
+
+    p = sub.add_parser("ask", help="向部門顧問提問")
+    p.add_argument("--club", required=True, help="社團資料 JSON")
+    p.add_argument("--dept", required=True, choices=list(DEPARTMENTS), help="部門")
+    p.add_argument("question", help="你的問題")
+    llm_opts(p)
+    p.set_defaults(func=cmd_ask)
 
     ev = sub.add_parser("eval", help="成果評鑑紀錄").add_subparsers(dest="eval_command", required=True)
     p = ev.add_parser("log", help="記錄一次實測（時間節省與主觀評分）")
