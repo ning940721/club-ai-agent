@@ -1,0 +1,7 @@
+# Dataset and generated vectors are not committed
+data/*
+!data/.gitkeep
+output/*
+!output/.gitkeep
+*.zip
+__pycache__/
