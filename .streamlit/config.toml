@@ -1,3 +1,25 @@
 [server]
 # 程式檔案更新後自動重新載入，網頁開著時也能直接套用新版
 runOnSave = true
+
+[client]
+# 隱藏右上角的 Deploy 等開發者選單
+toolbarMode = "minimal"
+
+[theme]
+base = "light"
+primaryColor = "#2D4A6B"
+backgroundColor = "#FAF9F6"
+secondaryBackgroundColor = "#F1EFEA"
+textColor = "#1D2433"
+linkColor = "#2D4A6B"
+borderColor = "#E2DED6"
+dataframeHeaderBackgroundColor = "#F1EFEA"
+font = "Noto Sans TC:https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap, sans-serif"
+headingFontWeights = [600, 600, 600, 600, 600, 600]
+headingFontSizes = ["1.75rem", "1.35rem", "1.12rem", "1rem", "0.95rem", "0.9rem"]
+baseRadius = "6px"
+showWidgetBorder = true
+
+[theme.sidebar]
+backgroundColor = "#F1EFEA"

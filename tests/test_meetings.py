@@ -137,7 +137,7 @@ def test_progress_reporter_prompt(club):
     prompt = llm.calls[0][1]
     assert "[公關]" in prompt and "- 行銷｜企劃" in prompt and "<today>2026-10-04</today>" in prompt
     md = progress_brief_markdown("測試社", "2026-10-04", brief)
-    assert "約 15 分鐘" in md and "⚠️ 回覆率低" in md
+    assert "約 15 分鐘" in md and "需要協助：回覆率低" in md
 
 
 def test_meeting_summary_markdown():

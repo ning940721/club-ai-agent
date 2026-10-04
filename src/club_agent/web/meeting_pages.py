@@ -106,7 +106,7 @@ def action_items_to_tasks(ctx: AppContext, doc: MeetingDoc) -> None:
             a = items[i]
             save_task(ctx.store, ctx.club_id, Task(title=a.task, department=a.department, owner=a.owner, due=a.due,
                                                    source=f"會議記錄「{doc.title}」"))
-        st.success(f"已加入 {len(chosen)} 項待辦，各部門可在「✅ 待辦與進度」看到")
+        st.success(f"已加入 {len(chosen)} 項待辦，各部門可在「待辦與進度」看到")
 
 
 def records_section(ctx: AppContext, docs: list[MeetingDoc]) -> None:
@@ -136,7 +136,7 @@ def records_section(ctx: AppContext, docs: list[MeetingDoc]) -> None:
 
 def meetings_page(ctx: AppContext) -> None:
     docs = list_meetings(ctx.store, ctx.club_id)
-    tab_ask, tab_add, tab_list = st.tabs(["❓ 問問題", "➕ 新增記錄", f"📚 所有記錄（{len(docs)}）"])
+    tab_ask, tab_add, tab_list = st.tabs(["問問題", "新增記錄", f"所有記錄（{len(docs)}）"])
     with tab_ask:
         ask_section(ctx, docs)
     with tab_add:

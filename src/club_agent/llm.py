@@ -28,6 +28,7 @@ DEFAULT_MODELS = {
     "claude": "claude-opus-5",
 }
 # 備用模型依序嘗試；已下架或不開放的模型（404）會自動略過
+DEFAULT_GEMINI_THINKING = "low"
 DEFAULT_GEMINI_FALLBACKS = ["gemini-3.8-flash", "gemini-flash-lite-latest", "gemini-pro-latest"]
 
 
@@ -90,7 +91,8 @@ class GeminiLLM:
         client=None,
         fallback_models: list[str] | None = None,
         retries_per_model: int = 2,
-        retry_wait_seconds: float = 10.0,
+        retry_wait_seconds: float = 5.0,
+        thinking: str | None = None,
         notify: Callable[[str], None] | None = None,
         sleep: Callable[[float], None] = time.sleep,
     ):
@@ -105,6 +107,9 @@ class GeminiLLM:
         self.fallback_models = [m for m in fallback_models if m != self.model]
         self.retries_per_model = retries_per_model
         self.retry_wait_seconds = retry_wait_seconds
+        # 思考程度：minimal／low／medium／high；越低越快。default 表示交給模型預設（通常較慢）
+        self.thinking = (thinking or os.environ.get("CLUB_AGENT_THINKING") or DEFAULT_GEMINI_THINKING).lower()
+        self._no_thinking_models: set[str] = set()
         self.notify = notify or (lambda msg: print(f"… {msg}", file=sys.stderr))
         self.sleep = sleep
 
@@ -158,20 +163,39 @@ class GeminiLLM:
             raise LLMError("短時間內呼叫太多次，超過 Gemini 免費版每分鐘的上限，請等 1–2 分鐘再試。" + detail)
         raise LLMError("Gemini 伺服器目前忙碌，所有模型都暫時無法使用，請稍後再試。" + detail)
 
-    def _generate(self, model: str, system: str, user: str, output_type: type[T]) -> T:
+    def _thinking_config(self, model: str):
         from google.genai import types
 
-        response = self.client.models.generate_content(
-            model=model,
-            contents=user,
-            config=types.GenerateContentConfig(
-                system_instruction=system,
-                max_output_tokens=self.max_output_tokens,
-                response_mime_type="application/json",
-                response_json_schema=inline_json_schema(output_type),
-                automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
-            ),
-        )
+        if self.thinking == "default" or model in self._no_thinking_models:
+            return None
+        return types.ThinkingConfig(thinking_level=self.thinking.upper())
+
+    def _generate(self, model: str, system: str, user: str, output_type: type[T]) -> T:
+        from google.genai import errors, types
+
+        def call():
+            return self.client.models.generate_content(
+                model=model,
+                contents=user,
+                config=types.GenerateContentConfig(
+                    thinking_config=self._thinking_config(model),
+                    system_instruction=system,
+                    max_output_tokens=self.max_output_tokens,
+                    response_mime_type="application/json",
+                    response_json_schema=inline_json_schema(output_type),
+                    automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
+                ),
+            )
+
+        try:
+            response = call()
+        except errors.ClientError as e:
+            if e.code == 400 and "thinking" in str(e.message).lower() and model not in self._no_thinking_models:
+                # 這個模型不支援思考程度設定，改用模型預設後立刻重試一次
+                self._no_thinking_models.add(model)
+                response = call()
+            else:
+                raise
         candidate = response.candidates[0] if response.candidates else None
         finish = candidate.finish_reason if candidate else None
         if finish == types.FinishReason.MAX_TOKENS:

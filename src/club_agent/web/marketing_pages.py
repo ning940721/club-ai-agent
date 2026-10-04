@@ -82,7 +82,7 @@ def campaign_page(ctx: AppContext) -> None:
 
     has_diag = st.session_state.get("diagnosis") is not None
     use_diag = st.checkbox("參考「社群數據診斷」的結果", value=has_diag, disabled=not has_diag)
-    rounds = st.slider("最多審查修訂輪數", 1, 3, 2, help="輪數越多品質可能越好，但等待時間與 API 用量也越多")
+    rounds = st.slider("最多審查修訂輪數", 1, 3, 1, help="每多一輪就多呼叫 AI 兩次。輪數越多品質可能越好，但等待時間與用量也會增加")
 
     if st.button("產生宣傳企劃", type="primary"):
         if not event_name.strip():

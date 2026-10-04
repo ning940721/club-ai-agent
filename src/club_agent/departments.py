@@ -23,7 +23,6 @@ FEATURE_MARKETING = "marketing_tools"
 class Department:
     key: str
     name: str
-    icon: str
     advisor_role: str = field(repr=False)
     focus: tuple[str, ...] = field(repr=False)
     example_questions: tuple[str, ...] = field(repr=False)
@@ -33,7 +32,7 @@ class Department:
 
     @property
     def label(self) -> str:
-        return f"{self.icon} {self.name}{'（測試版）' if self.beta else ''}"
+        return f"{self.name}{'（測試版）' if self.beta else ''}"
 
 
 DEPARTMENTS: dict[str, Department] = {
@@ -42,7 +41,6 @@ DEPARTMENTS: dict[str, Department] = {
         Department(
             key="president",
             name="社長",
-            icon="👑",
             advisor_role="社團經營與領導顧問",
             focus=("各部門進度掌握", "會議議程規劃", "組織分工與決策", "社團年度規劃"),
             example_questions=("幹部之間分工不清楚，要怎麼重新安排？", "這學期的社團目標要怎麼訂？"),
@@ -52,7 +50,6 @@ DEPARTMENTS: dict[str, Department] = {
         Department(
             key="marketing",
             name="行銷",
-            icon="📣",
             beta=False,
             advisor_role="資深校園社群行銷顧問",
             focus=("社群經營與數據解讀", "活動宣傳時程", "多平台文案", "品牌形象一致性"),
@@ -63,7 +60,6 @@ DEPARTMENTS: dict[str, Department] = {
         Department(
             key="pr",
             name="公關",
-            icon="🤝",
             advisor_role="社團公關與企業贊助顧問",
             focus=("企業贊助提案", "公關信與合作邀約", "跨社團與校外合作", "贊助回饋與露出"),
             example_questions=("想找飲料店贊助成果展，提案信要怎麼寫？", "合作社團臨時退出聯展，要怎麼對外溝通？"),
@@ -72,7 +68,6 @@ DEPARTMENTS: dict[str, Department] = {
         Department(
             key="finance",
             name="財務",
-            icon="💰",
             advisor_role="社團財務與預算健檢顧問",
             focus=("活動預算編列", "記帳與核銷流程", "社費與收支控管", "財務透明與交接"),
             example_questions=("成果展預算 3 萬元，要怎麼分配比較合理？", "社費收支一直對不起來，記帳流程該怎麼改？"),
@@ -81,7 +76,6 @@ DEPARTMENTS: dict[str, Department] = {
         Department(
             key="events",
             name="活動",
-            icon="🎪",
             advisor_role="校園活動企劃與執行顧問",
             focus=("活動企劃書", "流程與分工", "風險與應變", "參與者體驗與回饋"),
             example_questions=("第一次辦迎新宿營，企劃書要包含哪些內容？", "活動當天人手不夠，事前要怎麼排班？"),
@@ -90,7 +84,6 @@ DEPARTMENTS: dict[str, Department] = {
         Department(
             key="minutes",
             name="會議記錄",
-            icon="📝",
             advisor_role="會議效率與文書顧問",
             focus=("會議議程設計", "會議紀錄格式", "決議與待辦追蹤", "交接文件整理"),
             example_questions=("幹部會常常開很久沒結論，議程要怎麼設計？", "幫我整理一份會議紀錄的標準格式"),
@@ -100,7 +93,6 @@ DEPARTMENTS: dict[str, Department] = {
         Department(
             key="courses",
             name="課程",
-            icon="📚",
             advisor_role="社課規劃與教學設計顧問",
             focus=("學期社課規劃", "講師邀請", "課程內容與教案", "出席率與學習回饋"),
             example_questions=("社課出席率越來越低，要怎麼提升？", "幫我規劃一學期 12 堂的初學者社課"),
@@ -109,7 +101,6 @@ DEPARTMENTS: dict[str, Department] = {
         Department(
             key="venue",
             name="總務（場地、器材）",
-            icon="🏛️",
             advisor_role="場地租借與總務顧問",
             focus=("場地申請流程與時程", "場地選擇與動線", "器材與物資清點", "場地使用規範"),
             example_questions=("期末成果展要借哪種場地？大概多久前要申請？", "社辦器材常常找不到，要怎麼管理借還？"),
@@ -118,7 +109,6 @@ DEPARTMENTS: dict[str, Department] = {
         Department(
             key="design",
             name="美宣",
-            icon="🎨",
             advisor_role="社團視覺設計與美宣顧問",
             focus=("海報與貼文設計需求", "品牌視覺規範", "設計排程", "印刷與輸出"),
             example_questions=("成果展海報要怎麼寫設計需求給美宣？", "我們社團需要一份視覺規範，要包含什麼？"),
@@ -127,7 +117,6 @@ DEPARTMENTS: dict[str, Department] = {
         Department(
             key="members",
             name="人資／社員",
-            icon="👥",
             advisor_role="社團人資與組織發展顧問",
             focus=("招生與面試流程", "社員參與與留任", "幹部培訓", "交接手冊"),
             example_questions=("新社員參加幾次就不來了，要怎麼提升留任？", "幹部交接要準備哪些文件？"),
@@ -170,10 +159,8 @@ class ClubSettings(BaseModel):
         return DEPARTMENTS[key].name if key in DEPARTMENTS else key
 
     def label(self, key: str) -> str:
-        d = DEPARTMENTS.get(key)
-        if d is None:
-            return key
-        return f"{d.icon} {self.name(key)}{'（測試版）' if d.beta else ''}"
+        """選單與列表顯示用的部門名稱。測試版標示只出現在部門頁面內，不放在選單中。"""
+        return self.name(key)
 
     def details(self, key: str) -> str:
         return self.config(key).details.strip()

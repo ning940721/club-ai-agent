@@ -56,13 +56,13 @@ def president_page(ctx: AppContext) -> None:
     upcoming = upcoming_dates(ctx, today)
     c1, c2 = st.columns(2)
     with c1:
-        st.markdown(f"**⚠️ 逾期任務（{len(overdue)}）**")
+        st.markdown(f"**逾期任務（{len(overdue)}）**")
         for t in overdue[:10]:
             st.markdown(f"- {ctx.settings.name(t.department)}｜{t.title}（{t.owner or '未指定'}，期限 {t.due}）")
         if not overdue:
-            st.caption("沒有逾期任務 👍")
+            st.caption("目前沒有逾期任務。")
     with c2:
-        st.markdown("**📅 近期重要日期**（來自會議記錄）")
+        st.markdown("**近期重要日期**（來自會議記錄）")
         for line in upcoming[:10]:
             st.markdown(f"- {line}")
         if not upcoming:

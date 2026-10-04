@@ -30,14 +30,14 @@ def get_department_retriever(key: str):
 
 def advisor_page(ctx: AppContext) -> None:
     dept = ctx.dept
-    if dept.beta:
-        st.info(f"「{ctx.dept_name}」顧問目前為測試版，知識庫仍在擴充中，建議請再自行確認。")
     st.caption("專長：" + "、".join(dept.focus))
+    if dept.beta:
+        st.caption("這個部門的顧問為測試版，知識庫仍在擴充中，建議請再自行確認。")
     if not ctx.settings.details(ctx.dept_key):
-        st.caption("💡 到「⚙️ 社團設定 → 部門設定」填寫這個部門的細節，建議會更貼近你們社團。")
+        st.caption("提示：到「社團設定 → 部門設定」填寫這個部門的細節，建議會更貼近你們社團。")
 
     q_key = f"question_{ctx.dept_key}"
-    st.markdown("**範例問題（點一下帶入）**")
+    st.markdown("**範例問題**（點一下帶入）")
     for i, example in enumerate(dept.example_questions):
         if st.button(example, key=f"ex_{ctx.dept_key}_{i}"):
             st.session_state[q_key] = example
@@ -120,7 +120,7 @@ def tasks_table(ctx: AppContext, tasks: list[Task], key: str, show_department: b
             "負責人": [t.owner for t in tasks],
             "期限": [t.due_date() for t in tasks],
             "狀態": [t.status for t in tasks],
-            "逾期": ["⚠️" if t.is_overdue(today) else "" for t in tasks],
+            "逾期": ["逾期" if t.is_overdue(today) else "" for t in tasks],
             "來源": [t.source for t in tasks],
             "刪除": [False for _ in tasks],
         }
@@ -212,8 +212,7 @@ def feed_page(ctx: AppContext) -> None:
         counts = pd.Series([r.department for r in all_records]).value_counts()
         st.caption("｜".join(f"{ctx.settings.label(k)} {n} 筆" for k, n in counts.items()))
     for r in records:
-        icon = DEPARTMENTS[r.department].icon if r.department in DEPARTMENTS else ""
-        st.markdown(f"**{icon} {r.title}**　{r.summary}")
+        st.markdown(f"**{r.title}**　{r.summary}")
         ctx.show_record(r, "feed")
 
 
@@ -257,7 +256,7 @@ def department_settings_form(settings: ClubSettings) -> ClubSettings:
     for key, d in DEPARTMENTS.items():
         cfg = settings.config(key)
         enabled = st.checkbox(d.label, value=cfg.enabled, key=f"set_en_{key}", help="、".join(d.focus))
-        with st.expander(f"{d.icon} {settings.name(key)}：名稱與細節"):
+        with st.expander(f"{settings.name(key)}：名稱與細節"):
             name = st.text_input("部門名稱（空白則使用預設）", value=cfg.display_name, placeholder=d.name, key=f"set_name_{key}")
             details = st.text_area("部門細節", value=cfg.details, placeholder=d.details_hint, key=f"set_details_{key}")
         configs[key] = DepartmentConfig(enabled=enabled, display_name=name.strip(), details=details.strip())
@@ -311,17 +310,17 @@ def help_page(csv_columns: list[str]) -> None:
         """
 ### 怎麼使用
 1. 在左側選擇**我的部門**。
-2. **💬 部門顧問**：輸入問題（或點範例問題），取得行動步驟與可直接使用的文件模板。
-3. **✅ 待辦與進度**：記錄部門的任務、負責人與期限；社長可以在總覽看到全社團進度。
-4. **🗂️ 社團動態**：所有部門的成果都會存在這裡，彼此看得到。
+2. **部門顧問**：輸入問題（或點範例問題），取得行動步驟與可直接使用的文件模板。
+3. **待辦與進度**：記錄部門的任務、負責人與期限；社長可以在總覽看到全社團進度。
+4. **社團動態**：所有部門的成果都會存在這裡，彼此看得到。
 5. 部分部門有專屬功能：
-   - 👑 社長：各部門進度總覽、自動產生進度彙整與會議議程
-   - 📝 會議記錄：上傳會議記錄或 LINE 對話，自動整理重點，還可以直接問問題
-   - 📣 行銷：社群數據診斷、活動宣傳企劃
-6. **⚙️ 社團設定**：選擇社團有哪些部門、改部門名稱、填寫部門細節、修改密碼。
+   - 社長：各部門進度總覽、自動產生進度彙整與會議議程
+   - 會議記錄：上傳會議記錄或 LINE 對話，自動整理重點，還可以直接問問題
+   - 行銷：社群數據診斷、活動宣傳企劃
+6. **社團設定**：選擇社團有哪些部門、改部門名稱、填寫部門細節、修改密碼。
 
 ### 怎麼匯出 LINE 對話記錄
-在 LINE 聊天室右上角選單 →「設定」→「傳送聊天記錄」，存成 .txt 檔後到「📝 會議記錄」上傳。
+在 LINE 聊天室右上角選單 →「設定」→「傳送聊天記錄」，存成 .txt 檔後到「會議記錄」上傳。
 
 ### 怎麼準備貼文數據 CSV（行銷）
 從 IG／FB 的「洞察報告」把每篇貼文的數據填進 CSV 範本，一列一篇，建議至少近三個月。

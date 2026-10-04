@@ -27,7 +27,7 @@ def diagnosis_markdown(club_name: str, report: DiagnosisReport) -> str:
 
 def campaign_markdown(result: CampaignResult) -> str:
     p = result.plan
-    status = "✅ 通過審查" if result.approved else "⚠️ 未通過審查（已達最大修訂輪數，請人工檢視）"
+    status = "通過審查" if result.approved else "未通過審查（已達最大修訂輪數，請人工檢視）"
     out = [
         f"# {p.campaign_name}",
         "",
@@ -57,11 +57,11 @@ def campaign_markdown(result: CampaignResult) -> str:
             "",
             post.body,
             "",
-            f"👉 {post.cta}",
+            f"**行動呼籲：** {post.cta}",
             "",
             " ".join(post.hashtags),
             "",
-            f"🎨 視覺建議：{post.visual_suggestion}",
+            f"**視覺建議：** {post.visual_suggestion}",
         ]
     if p.story_scripts:
         out += ["", "## 限時動態腳本"]
@@ -88,7 +88,7 @@ def advice_markdown(department_name: str, question: str, advice: Advice) -> str:
             for i, s in enumerate(advice.steps, 1)
         ]
     for d in advice.deliverables:
-        out += ["", f"## 📄 {d.title}", "", d.content]
+        out += ["", f"## {d.title}", "", d.content]
     if advice.coordination:
         out += ["", "## 跨部門協作", *[f"- **{c.department}**：{c.what}" for c in advice.coordination]]
     if advice.risks:
@@ -129,7 +129,7 @@ def progress_brief_markdown(club_name: str, today: str, b: ProgressBrief) -> str
     for d in b.departments:
         out += ["", f"### {d.department}", d.progress]
         out += [f"- 進行中：{x}" for x in d.doing]
-        out += [f"- ⚠️ {x}" for x in d.blockers]
+        out += [f"- 需要協助：{x}" for x in d.blockers]
     if b.agenda:
         total = sum(a.minutes for a in b.agenda)
         out += ["", f"## 下次會議議程（約 {total} 分鐘）", "| # | 議題 | 類型 | 部門 | 時間 | 目標 |", "|---|---|---|---|---|---|"]

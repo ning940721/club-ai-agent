@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import time
 from dataclasses import dataclass
 from typing import Any, Callable
 
@@ -29,6 +30,7 @@ class AppContext:
     api_key: str | None
     model: str | None
     max_runs: int
+    thinking: str | None = None
 
     @property
     def dept(self) -> Department:
@@ -41,7 +43,7 @@ class AppContext:
     def make_llm(self, status) -> GeminiLLM:
         from google import genai
 
-        return GeminiLLM(model=self.model, client=genai.Client(api_key=self.api_key), notify=status.write)
+        return GeminiLLM(model=self.model, client=genai.Client(api_key=self.api_key), notify=status.write, thinking=self.thinking)
 
     def check_quota(self) -> bool:
         used = st.session_state.get("runs", 0)
@@ -58,13 +60,15 @@ class AppContext:
             return None
         if not self.check_quota():
             return None
+        started = time.monotonic()
         with st.status(label, expanded=True) as status:
             try:
                 result = fn(self.make_llm(status), status)
-                status.update(label=done_label, state="complete", expanded=False)
+                elapsed = time.monotonic() - started
+                status.update(label=f"{done_label}（花了 {elapsed:.0f} 秒）", state="complete", expanded=False)
                 return result
             except LLMError as e:
-                status.update(label="失敗", state="error")
+                status.update(label=f"失敗（花了 {time.monotonic() - started:.0f} 秒）", state="error")
                 st.error(str(e))
                 return None
 

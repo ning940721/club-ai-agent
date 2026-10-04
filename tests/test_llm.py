@@ -167,3 +167,31 @@ def test_all_models_unavailable_explains_setting():
     llm = GeminiLLM(model="a", client=FakeClient(models), fallback_models=["b"], notify=lambda _m: None, sleep=lambda _s: None)
     with pytest.raises(LLMError, match="GEMINI_MODEL"):
         llm.structured("s", "u", Critique)
+
+
+def test_thinking_level_is_sent_and_configurable(monkeypatch):
+    monkeypatch.delenv("CLUB_AGENT_THINKING", raising=False)
+    models = FakeModels(json.dumps(CRITIQUE))
+    GeminiLLM(client=FakeClient(models)).structured("s", "u", Critique)
+    assert models.kwargs["config"].thinking_config.thinking_level == "LOW"  # 預設低思考程度，回應較快
+
+    GeminiLLM(client=FakeClient(models), thinking="minimal").structured("s", "u", Critique)
+    assert models.kwargs["config"].thinking_config.thinking_level == "MINIMAL"
+
+    GeminiLLM(client=FakeClient(models), thinking="default").structured("s", "u", Critique)
+    assert models.kwargs["config"].thinking_config is None
+
+
+def test_model_without_thinking_level_support_retries_without_it():
+    from google.genai import errors
+
+    class RejectThinking(FakeModels):
+        def generate_content(self, **kwargs):
+            if kwargs["config"].thinking_config is not None:
+                raise errors.ClientError(400, {"error": {"code": 400, "message": "Thinking level is not supported", "status": "INVALID_ARGUMENT"}})
+            return super().generate_content(**kwargs)
+
+    models = RejectThinking(json.dumps(CRITIQUE))
+    llm = GeminiLLM(model="old-model", client=FakeClient(models), fallback_models=[], notify=lambda _m: None)
+    assert llm.structured("s", "u", Critique).scores[0].score == 4
+    assert llm.structured("s", "u", Critique).scores[0].score == 4  # 記住這個模型不支援，之後直接不送

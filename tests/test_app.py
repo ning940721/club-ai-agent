@@ -75,6 +75,10 @@ def _signup(at, account="test-club", password="secret123"):
     assert not at.exception
 
 
+def _page_title(at) -> str:
+    return " ".join(m.value for m in at.markdown if "page-title" in m.value)
+
+
 def _switch(at, dept):
     at.selectbox(key="dept").select(dept).run()
     assert not at.exception
@@ -83,8 +87,8 @@ def _switch(at, dept):
 def test_signup_lands_on_president_overview():
     at = _app()
     _signup(at)
-    assert "社長" in at.title[0].value
-    assert at.selectbox(key="dept").options == ["👑 社長（測試版）", "📣 行銷", "🤝 公關（測試版）", "💰 財務（測試版）", "🎪 活動（測試版）", "📝 會議記錄（測試版）"]
+    assert "社長" in _page_title(at) and "測試攝影社" in _page_title(at)
+    assert at.selectbox(key="dept").options == ["社長", "行銷", "公關", "財務", "活動", "會議記錄"]
     _button(at, "產生進度彙整與議程").click().run()
     assert not at.exception
     assert any("各部門進度正常" in m.value for m in at.markdown)
@@ -115,7 +119,7 @@ def test_tasks_added_in_department_show_on_president_overview():
     _switch(at, "president")
     assert not at.exception
     table = at.dataframe[0].value
-    assert table.loc[table["部門"] == "🤝 公關（測試版）", "未完成"].item() == 1
+    assert table.loc[table["部門"] == "公關", "未完成"].item() == 1
 
 
 def test_meeting_summary_tasks_and_qa():
@@ -148,7 +152,7 @@ def test_settings_enable_rename_and_details():
     _button(at, "儲存部門設定").click().run()
     assert not at.exception
     options = at.selectbox(key="dept").options
-    assert "📚 課程（測試版）" in options and "💰 財務長（測試版）" in options
+    assert "課程" in options and "財務長" in options
 
     at.checkbox(key="set_en_president").uncheck()
     _button(at, "儲存部門設定").click().run()
@@ -173,7 +177,7 @@ def test_login_logout_and_change_password():
     assert any("帳號或密碼錯誤" in e.value for e in at.error)
     at.text_input[1].input("newpass123")
     at.button[0].click().run()
-    assert "測試攝影社" in at.title[0].value
+    assert "測試攝影社" in _page_title(at)
 
 
 def test_marketing_tools_flow():

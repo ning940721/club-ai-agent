@@ -32,7 +32,7 @@ def test_club_settings_names_and_details():
     assert s.enabled_keys() == list(DEFAULT_ENABLED)
     s.departments["finance"] = DepartmentConfig(enabled=True, display_name="財務長", details="500 元以上需社長核准")
     assert s.name("finance") == "財務長" and s.name("pr") == "公關"
-    assert s.label("finance") == "💰 財務長（測試版）"
+    assert s.label("finance") == "財務長"
     assert "500 元以上需社長核准" in s.all_details_text()
     assert "課程" not in s.all_details_text()  # 未啟用的部門不列入
 
