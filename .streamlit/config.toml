@@ -1,6 +1,7 @@
 [server]
-# 程式檔案更新後自動重新載入，網頁開著時也能直接套用新版
-runOnSave = true
+# 不在檔案變動時自動重跑：更新程式（git pull）的瞬間檔案可能暫時不存在，自動重跑會出現
+# 「No such file or directory: app.py」。更新後請關掉黑色視窗，再雙擊「啟動網頁」。
+runOnSave = false
 
 [client]
 # 隱藏右上角的 Deploy 等開發者選單
