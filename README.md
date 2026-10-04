@@ -7,6 +7,7 @@
 - `make_submission.py` – `python make_submission.py <學號>` packs `<學號>.zip` in the required layout
 
 ```bash
+pip install nltk
 # put the 1095 documents in ./data first
 python pa2.py
 python pa2.py --cosine 1 2
