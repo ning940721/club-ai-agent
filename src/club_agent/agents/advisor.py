@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from ..departments import Department
+from ..departments import ClubSettings, Department
 from ..llm import LLM
 from ..retriever import Retriever, format_context
 from ..schemas import Advice, ClubProfile
@@ -29,14 +29,32 @@ class DepartmentAdvisor:
         self.llm = llm
         self.retriever = retriever
 
-    def system_prompt(self, dept: Department) -> str:
-        return SYSTEM_PROMPT.format(role=dept.advisor_role, name=dept.name, focus="、".join(dept.focus))
+    def system_prompt(self, dept: Department, settings: ClubSettings | None = None) -> str:
+        name = settings.name(dept.key) if settings else dept.name
+        return SYSTEM_PROMPT.format(role=dept.advisor_role, name=name, focus="、".join(dept.focus))
 
-    def build_prompt(self, club: ClubProfile, dept: Department, question: str, club_activity: str = "") -> str:
+    def build_prompt(
+        self,
+        club: ClubProfile,
+        dept: Department,
+        question: str,
+        club_activity: str = "",
+        settings: ClubSettings | None = None,
+        dept_tasks: str = "",
+    ) -> str:
         context = format_context(self.retriever.search(f"{dept.name} {question}", k=4))
+        details = settings.details(dept.key) if settings else ""
         return f"""<club_profile>
 {club.model_dump_json(indent=2)}
 </club_profile>
+
+<department_details>
+{details or "（社團尚未填寫這個部門的細節）"}
+</department_details>
+
+<department_tasks>
+{dept_tasks or "（沒有未完成的任務）"}
+</department_tasks>
 
 <other_departments_recent_activity>
 {club_activity or "（目前沒有其他部門的紀錄）"}
@@ -46,12 +64,20 @@ class DepartmentAdvisor:
 {context}
 </knowledge_base>
 
-<question department="{dept.name}">
+<question>
 {question}
 </question>
 
-請以{dept.name}部門顧問的角色回答這個問題。"""
+請以部門顧問的角色回答這個問題，並遵守部門細節中的規定。"""
 
-    def run(self, club: ClubProfile, dept: Department, question: str, club_activity: str = "") -> Advice:
-        prompt = self.build_prompt(club, dept, question, club_activity)
-        return self.llm.structured(self.system_prompt(dept), prompt, Advice)
+    def run(
+        self,
+        club: ClubProfile,
+        dept: Department,
+        question: str,
+        club_activity: str = "",
+        settings: ClubSettings | None = None,
+        dept_tasks: str = "",
+    ) -> Advice:
+        prompt = self.build_prompt(club, dept, question, club_activity, settings, dept_tasks)
+        return self.llm.structured(self.system_prompt(dept, settings), prompt, Advice)

@@ -47,3 +47,52 @@ def test_records_isolated_between_clubs(tmp_path, club):
     b = store.create_club("club-b", "secret123", club)
     store.add_record(a, Record(department="pr", kind="advice", title="A 的問題", summary="s", markdown="m"))
     assert store.list_records(b) == []
+
+
+def test_settings_default_update_and_legacy(tmp_path, club):
+    from club_agent.departments import DEFAULT_ENABLED, ClubSettings
+    from club_agent.store import LEGACY_ENABLED
+
+    store = LocalClubStore(tmp_path)
+    club_id = store.create_club("s-club", "secret123", club)
+    assert store.get_settings(club_id).enabled_keys() == list(DEFAULT_ENABLED)
+    store.update_settings(club_id, ClubSettings.default(["finance", "minutes"]))
+    assert store.get_settings(club_id).enabled_keys() == ["finance", "minutes"]
+    with pytest.raises(StoreError, match="至少"):
+        store.update_settings(club_id, ClubSettings.default([]))
+
+    # 舊版帳號（沒有 settings 欄位）沿用舊的部門
+    path = tmp_path / "clubs" / club_id / "club.json"
+    import json
+
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    raw.pop("settings")
+    path.write_text(json.dumps(raw, ensure_ascii=False), encoding="utf-8")
+    assert set(store.get_settings(club_id).enabled_keys()) == set(LEGACY_ENABLED)
+
+
+def test_change_password(tmp_path, club):
+    store = LocalClubStore(tmp_path)
+    club_id = store.create_club("p-club", "secret123", club)
+    with pytest.raises(StoreError, match="不正確"):
+        store.change_password(club_id, "wrong", "newpass123")
+    with pytest.raises(StoreError, match="至少"):
+        store.change_password(club_id, "secret123", "123")
+    store.change_password(club_id, "secret123", "newpass123")
+    assert store.authenticate("p-club", "newpass123") == club_id
+    assert store.authenticate("p-club", "secret123") is None
+
+
+def test_doc_collections(tmp_path, club):
+    store = LocalClubStore(tmp_path)
+    club_id = store.create_club("d-club", "secret123", club)
+    store.put_doc(club_id, "tasks", "a", {"x": 1})
+    store.put_doc(club_id, "tasks", "b", {"x": 2})
+    store.put_doc(club_id, "tasks", "a", {"x": 3})
+    assert store.get_doc(club_id, "tasks", "a") == {"x": 3}
+    assert sorted(d["x"] for d in store.list_docs(club_id, "tasks")) == [2, 3]
+    store.delete_doc(club_id, "tasks", "a")
+    assert store.get_doc(club_id, "tasks", "a") is None
+    assert store.list_docs(club_id, "meetings") == []
+    with pytest.raises(StoreError):
+        store.put_doc(club_id, "../evil", "x", {})

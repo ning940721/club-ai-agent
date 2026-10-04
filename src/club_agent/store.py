@@ -23,7 +23,11 @@ from typing import Protocol
 
 from pydantic import BaseModel, Field
 
+from .departments import ClubSettings
 from .schemas import ClubProfile
+
+# 舊版建立、沒有部門設定的社團：沿用當時的七個部門，並加上社長
+LEGACY_ENABLED = ("president", "marketing", "pr", "finance", "events", "minutes", "courses", "venue")
 
 PBKDF2_ITERATIONS = 200_000
 MIN_PASSWORD_LENGTH = 6
@@ -50,10 +54,16 @@ class ClubAccount(BaseModel):
     password_hash: str
     created_at: str
     profile: ClubProfile
+    settings: ClubSettings = Field(default_factory=lambda: ClubSettings.default(LEGACY_ENABLED))
 
 
 def normalize_account(account: str) -> str:
     return account.strip().lower()
+
+
+def _check_password(password: str) -> None:
+    if len(password) < MIN_PASSWORD_LENGTH:
+        raise StoreError(f"密碼至少需要 {MIN_PASSWORD_LENGTH} 個字元")
 
 
 def club_id_for(account: str) -> str:
@@ -65,10 +75,68 @@ def hash_password(password: str, salt: str) -> str:
 
 
 class ClubStore(Protocol):
-    def create_club(self, account: str, password: str, profile: ClubProfile) -> str: ...
+    def create_club(self, account: str, password: str, profile: ClubProfile, settings: ClubSettings | None = None) -> str: ...
     def authenticate(self, account: str, password: str) -> str | None: ...
+    def change_password(self, club_id: str, old_password: str, new_password: str) -> None: ...
+    def change_password(self, club_id: str, old_password: str, new_password: str) -> None:
+        acct = self._load(club_id)
+        if not hmac.compare_digest(hash_password(old_password, acct.password_salt), acct.password_hash):
+            raise StoreError("目前的密碼不正確")
+        _check_password(new_password)
+        salt = secrets.token_hex(16)
+        self._save(acct.model_copy(update={"password_salt": salt, "password_hash": hash_password(new_password, salt)}))
+
+    def get_settings(self, club_id: str) -> ClubSettings:
+        return self._load(club_id).settings
+
+    def update_settings(self, club_id: str, settings: ClubSettings) -> None:
+        if not settings.enabled_keys():
+            raise StoreError("至少要啟用一個部門")
+        acct = self._load(club_id)
+        self._save(acct.model_copy(update={"settings": settings}))
+
+    # --- 通用資料集合（待辦、會議記錄等），每個集合存成一個 JSON 檔 ---
+
+    def _collection_path(self, club_id: str, collection: str) -> Path:
+        if not collection.isidentifier():
+            raise StoreError(f"不合法的集合名稱：{collection}")
+        self._load(club_id)  # 確認社團存在
+        return self._dir(club_id) / f"{collection}.json"
+
+    def _read_collection(self, path: Path) -> dict[str, dict]:
+        return json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+
+    def _write_collection(self, path: Path, docs: dict[str, dict]) -> None:
+        tmp = path.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(docs, ensure_ascii=False, indent=2), encoding="utf-8")
+        tmp.replace(path)
+
+    def put_doc(self, club_id: str, collection: str, doc_id: str, data: dict) -> None:
+        path = self._collection_path(club_id, collection)
+        docs = self._read_collection(path)
+        docs[doc_id] = data
+        self._write_collection(path, docs)
+
+    def get_doc(self, club_id: str, collection: str, doc_id: str) -> dict | None:
+        return self._read_collection(self._collection_path(club_id, collection)).get(doc_id)
+
+    def list_docs(self, club_id: str, collection: str) -> list[dict]:
+        return list(self._read_collection(self._collection_path(club_id, collection)).values())
+
+    def delete_doc(self, club_id: str, collection: str, doc_id: str) -> None:
+        path = self._collection_path(club_id, collection)
+        docs = self._read_collection(path)
+        if docs.pop(doc_id, None) is not None:
+            self._write_collection(path, docs)
+
     def get_profile(self, club_id: str) -> ClubProfile: ...
     def update_profile(self, club_id: str, profile: ClubProfile) -> None: ...
+    def get_settings(self, club_id: str) -> ClubSettings: ...
+    def update_settings(self, club_id: str, settings: ClubSettings) -> None: ...
+    def put_doc(self, club_id: str, collection: str, doc_id: str, data: dict) -> None: ...
+    def get_doc(self, club_id: str, collection: str, doc_id: str) -> dict | None: ...
+    def list_docs(self, club_id: str, collection: str) -> list[dict]: ...
+    def delete_doc(self, club_id: str, collection: str, doc_id: str) -> None: ...
     def add_record(self, club_id: str, record: Record) -> None: ...
     def list_records(self, club_id: str, department: str | None = None, limit: int | None = None) -> list[Record]: ...
 
@@ -93,12 +161,11 @@ class LocalClubStore:
         tmp.write_text(acct.model_dump_json(indent=2), encoding="utf-8")
         tmp.replace(d / "club.json")
 
-    def create_club(self, account: str, password: str, profile: ClubProfile) -> str:
+    def create_club(self, account: str, password: str, profile: ClubProfile, settings: ClubSettings | None = None) -> str:
         account = normalize_account(account)
         if not account:
             raise StoreError("請輸入帳號")
-        if len(password) < MIN_PASSWORD_LENGTH:
-            raise StoreError(f"密碼至少需要 {MIN_PASSWORD_LENGTH} 個字元")
+        _check_password(password)
         club_id = club_id_for(account)
         if (self._dir(club_id) / "club.json").exists():
             raise StoreError("這個帳號已經有人使用，請換一個")
@@ -111,6 +178,7 @@ class LocalClubStore:
                 password_hash=hash_password(password, salt),
                 created_at=datetime.now().isoformat(timespec="seconds"),
                 profile=profile,
+                settings=settings or ClubSettings.default(),
             )
         )
         return club_id
@@ -122,6 +190,57 @@ class LocalClubStore:
             return None
         ok = hmac.compare_digest(hash_password(password, acct.password_salt), acct.password_hash)
         return acct.club_id if ok else None
+
+    def change_password(self, club_id: str, old_password: str, new_password: str) -> None:
+        acct = self._load(club_id)
+        if not hmac.compare_digest(hash_password(old_password, acct.password_salt), acct.password_hash):
+            raise StoreError("目前的密碼不正確")
+        _check_password(new_password)
+        salt = secrets.token_hex(16)
+        self._save(acct.model_copy(update={"password_salt": salt, "password_hash": hash_password(new_password, salt)}))
+
+    def get_settings(self, club_id: str) -> ClubSettings:
+        return self._load(club_id).settings
+
+    def update_settings(self, club_id: str, settings: ClubSettings) -> None:
+        if not settings.enabled_keys():
+            raise StoreError("至少要啟用一個部門")
+        acct = self._load(club_id)
+        self._save(acct.model_copy(update={"settings": settings}))
+
+    # --- 通用資料集合（待辦、會議記錄等），每個集合存成一個 JSON 檔 ---
+
+    def _collection_path(self, club_id: str, collection: str) -> Path:
+        if not collection.isidentifier():
+            raise StoreError(f"不合法的集合名稱：{collection}")
+        self._load(club_id)  # 確認社團存在
+        return self._dir(club_id) / f"{collection}.json"
+
+    def _read_collection(self, path: Path) -> dict[str, dict]:
+        return json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+
+    def _write_collection(self, path: Path, docs: dict[str, dict]) -> None:
+        tmp = path.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(docs, ensure_ascii=False, indent=2), encoding="utf-8")
+        tmp.replace(path)
+
+    def put_doc(self, club_id: str, collection: str, doc_id: str, data: dict) -> None:
+        path = self._collection_path(club_id, collection)
+        docs = self._read_collection(path)
+        docs[doc_id] = data
+        self._write_collection(path, docs)
+
+    def get_doc(self, club_id: str, collection: str, doc_id: str) -> dict | None:
+        return self._read_collection(self._collection_path(club_id, collection)).get(doc_id)
+
+    def list_docs(self, club_id: str, collection: str) -> list[dict]:
+        return list(self._read_collection(self._collection_path(club_id, collection)).values())
+
+    def delete_doc(self, club_id: str, collection: str, doc_id: str) -> None:
+        path = self._collection_path(club_id, collection)
+        docs = self._read_collection(path)
+        if docs.pop(doc_id, None) is not None:
+            self._write_collection(path, docs)
 
     def get_profile(self, club_id: str) -> ClubProfile:
         return self._load(club_id).profile
@@ -147,15 +266,19 @@ class LocalClubStore:
         return records[:limit] if limit else records
 
 
-def activity_digest(records: list[Record], exclude_department: str | None = None, limit: int = 8) -> str:
+def activity_digest(
+    records: list[Record],
+    exclude_department: str | None = None,
+    limit: int = 8,
+    settings: ClubSettings | None = None,
+) -> str:
     """把其他部門的近期紀錄整理成給 AI 參考的摘要。"""
-    from .departments import DEPARTMENTS
-
+    settings = settings or ClubSettings.default()
     lines = []
     for r in records:
         if r.department == exclude_department:
             continue
-        name = DEPARTMENTS[r.department].name if r.department in DEPARTMENTS else r.department
+        name = settings.name(r.department)
         lines.append(f"- {r.created_at[:10]}｜{name}｜{r.title}：{r.summary}")
         if len(lines) >= limit:
             break

@@ -186,3 +186,71 @@ class Advice(BaseModel):
     coordination: list[Coordination] = Field(description="需要和其他部門協作的事項；不需要時可為空")
     risks: list[str] = Field(description="需要注意的風險或常見錯誤")
     info_needed: list[str] = Field(description="還需要使用者補充、才能給出更精準建議的資訊")
+
+
+# ---------------------------------------------------------------------------
+# 會議記錄：重點彙整與問答
+# ---------------------------------------------------------------------------
+
+
+class ActionItem(BaseModel):
+    task: str = Field(description="要做的事")
+    owner: str = Field(description="負責人；記錄中沒有寫明時填空字串")
+    department: str = Field(description="負責部門的代號，必須是提供的部門清單中的代號；無法判斷時填 president")
+    due: str = Field(description="期限 YYYY-MM-DD；記錄中沒有寫明時填空字串")
+
+
+class KeyDate(BaseModel):
+    event: str = Field(description="事件，如：下次幹部會、成果展、報名截止")
+    date: str = Field(description="日期 YYYY-MM-DD；只知道月日時依記錄日期推算年份")
+    time: str = Field(description="時間 HH:MM；不知道時填空字串")
+    location: str = Field(description="地點；不知道時填空字串")
+
+
+class MeetingSummary(BaseModel):
+    title: str = Field(description="會議或對話的簡短標題")
+    summary: str = Field(description="3–5 句重點摘要")
+    decisions: list[str] = Field(description="已做成的決議")
+    action_items: list[ActionItem] = Field(description="待辦事項")
+    key_dates: list[KeyDate] = Field(description="提到的重要日期，包含下次開會時間")
+    open_questions: list[str] = Field(description="尚未決定、需要後續討論的事項")
+
+
+class SourceRef(BaseModel):
+    title: str = Field(description="來源會議記錄的標題")
+    date: str = Field(description="來源的日期")
+    excerpt: str = Field(description="支持答案的原文片段（直接引用）")
+
+
+class MeetingAnswer(BaseModel):
+    found: bool = Field(description="記錄中是否找得到答案")
+    answer: str = Field(description="直接回答問題；找不到時說明記錄中沒有提到")
+    sources: list[SourceRef] = Field(description="答案依據的原文；找不到時為空")
+
+
+# ---------------------------------------------------------------------------
+# 社長：進度彙整與會議議程
+# ---------------------------------------------------------------------------
+
+
+class DepartmentStatus(BaseModel):
+    department: str = Field(description="部門名稱")
+    doing: list[str] = Field(description="目前正在進行的事")
+    progress: str = Field(description="一句話描述整體進度")
+    blockers: list[str] = Field(description="卡關、逾期或需要協助的事項；沒有時為空")
+
+
+class AgendaItem(BaseModel):
+    topic: str = Field(description="議題")
+    department: str = Field(description="負責報告或主持的部門")
+    kind: Literal["報告", "討論", "決議"]
+    minutes: int = Field(description="建議討論分鐘數")
+    goal: str = Field(description="這個議題要得到什麼結果")
+
+
+class ProgressBrief(BaseModel):
+    overview: str = Field(description="全社團目前狀態的總結（3–5 句）")
+    departments: list[DepartmentStatus]
+    agenda: list[AgendaItem] = Field(description="下次會議建議議程，依討論順序排列")
+    decisions_needed: list[str] = Field(description="需要社長或幹部會做決定的事項")
+    reminders: list[str] = Field(description="近期重要日期與提醒")

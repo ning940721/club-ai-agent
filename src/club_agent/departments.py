@@ -1,7 +1,7 @@
-"""社團部門與各部門顧問的角色設定。
+"""社團部門、各部門顧問角色，以及每個社團的部門設定。
 
-本期以「行銷」為正式模組（另有數據診斷、宣傳企劃等專屬工具），
-其餘部門以通用的「部門顧問」提供建議，標示為測試版，之後再逐一深化。
+每個社團可以選擇啟用哪些部門、自訂部門名稱，並填寫「部門細節」（例如報帳規定、
+固定開會時間），AI 會依這些細節微調建議。行銷為正式模組，其餘部門標示為測試版。
 """
 
 from __future__ import annotations
@@ -9,7 +9,14 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from pydantic import BaseModel, Field
+
 from .retriever import DEFAULT_KB_DIR, BM25Retriever, Chunk, split_markdown
+
+# 各部門可用的專屬功能（網頁分頁）
+FEATURE_PRESIDENT = "president_overview"
+FEATURE_MEETINGS = "meetings"
+FEATURE_MARKETING = "marketing_tools"
 
 
 @dataclass(frozen=True)
@@ -20,6 +27,8 @@ class Department:
     advisor_role: str = field(repr=False)
     focus: tuple[str, ...] = field(repr=False)
     example_questions: tuple[str, ...] = field(repr=False)
+    details_hint: str = field(default="", repr=False)
+    features: tuple[str, ...] = field(default=(), repr=False)
     beta: bool = True
 
     @property
@@ -31,16 +40,25 @@ DEPARTMENTS: dict[str, Department] = {
     d.key: d
     for d in [
         Department(
+            key="president",
+            name="社長",
+            icon="👑",
+            advisor_role="社團經營與領導顧問",
+            focus=("各部門進度掌握", "會議議程規劃", "組織分工與決策", "社團年度規劃"),
+            example_questions=("幹部之間分工不清楚，要怎麼重新安排？", "這學期的社團目標要怎麼訂？"),
+            details_hint="例：幹部會每兩週一次；重大決策需幹部會過半同意；本學期目標是招到 40 位新社員",
+            features=(FEATURE_PRESIDENT,),
+        ),
+        Department(
             key="marketing",
             name="行銷",
             icon="📣",
             beta=False,
             advisor_role="資深校園社群行銷顧問",
             focus=("社群經營與數據解讀", "活動宣傳時程", "多平台文案", "品牌形象一致性"),
-            example_questions=(
-                "粉專觸及最近一直下降，下個月該怎麼調整發文策略？",
-                "招生季快到了，要怎麼規劃兩週的宣傳？",
-            ),
+            example_questions=("粉專觸及最近一直下降，下個月該怎麼調整發文策略？", "招生季快到了，要怎麼規劃兩週的宣傳？"),
+            details_hint="例：主要經營 IG，每週發 2 篇；主視覺色為深藍與米白；限動由副社長審核後發布",
+            features=(FEATURE_MARKETING,),
         ),
         Department(
             key="pr",
@@ -48,10 +66,8 @@ DEPARTMENTS: dict[str, Department] = {
             icon="🤝",
             advisor_role="社團公關與企業贊助顧問",
             focus=("企業贊助提案", "公關信與合作邀約", "跨社團與校外合作", "贊助回饋與露出"),
-            example_questions=(
-                "想找飲料店贊助成果展，提案信要怎麼寫？",
-                "合作社團臨時退出聯展，要怎麼對外溝通？",
-            ),
+            example_questions=("想找飲料店贊助成果展，提案信要怎麼寫？", "合作社團臨時退出聯展，要怎麼對外溝通？"),
+            details_hint="例：常合作對象為校園周邊餐飲；贊助回饋可提供 IG 貼文與攤位；對外信件需副本給社長",
         ),
         Department(
             key="finance",
@@ -59,10 +75,8 @@ DEPARTMENTS: dict[str, Department] = {
             icon="💰",
             advisor_role="社團財務與預算健檢顧問",
             focus=("活動預算編列", "記帳與核銷流程", "社費與收支控管", "財務透明與交接"),
-            example_questions=(
-                "成果展預算 3 萬元，要怎麼分配比較合理？",
-                "社費收支一直對不起來，記帳流程該怎麼改？",
-            ),
+            example_questions=("成果展預算 3 萬元，要怎麼分配比較合理？", "社費收支一直對不起來，記帳流程該怎麼改？"),
+            details_hint="例：報帳需附發票正本與活動名稱；500 元以上需社長核准；每月 5 號統一撥款",
         ),
         Department(
             key="events",
@@ -70,21 +84,8 @@ DEPARTMENTS: dict[str, Department] = {
             icon="🎪",
             advisor_role="校園活動企劃與執行顧問",
             focus=("活動企劃書", "流程與分工", "風險與應變", "參與者體驗與回饋"),
-            example_questions=(
-                "第一次辦迎新宿營，企劃書要包含哪些內容？",
-                "活動當天人手不夠，事前要怎麼排班？",
-            ),
-        ),
-        Department(
-            key="venue",
-            name="場地",
-            icon="🏛️",
-            advisor_role="場地租借與總務顧問",
-            focus=("場地申請流程與時程", "場地選擇與動線", "器材與物資清點", "場地使用規範"),
-            example_questions=(
-                "期末成果展要借哪種場地？大概多久前要申請？",
-                "社辦器材常常找不到，要怎麼管理借還？",
-            ),
+            example_questions=("第一次辦迎新宿營，企劃書要包含哪些內容？", "活動當天人手不夠，事前要怎麼排班？"),
+            details_hint="例：每學期固定辦迎新、期中聯誼、期末成果展；活動企劃需在一個月前送幹部會",
         ),
         Department(
             key="minutes",
@@ -92,10 +93,9 @@ DEPARTMENTS: dict[str, Department] = {
             icon="📝",
             advisor_role="會議效率與文書顧問",
             focus=("會議議程設計", "會議紀錄格式", "決議與待辦追蹤", "交接文件整理"),
-            example_questions=(
-                "幹部會常常開很久沒結論，議程要怎麼設計？",
-                "幫我整理一份會議紀錄的標準格式",
-            ),
+            example_questions=("幹部會常常開很久沒結論，議程要怎麼設計？", "幫我整理一份會議紀錄的標準格式"),
+            details_hint="例：幹部會固定週三晚上 7 點；主要溝通在 LINE 幹部群組；會議記錄存放在雲端硬碟",
+            features=(FEATURE_MEETINGS,),
         ),
         Department(
             key="courses",
@@ -103,16 +103,88 @@ DEPARTMENTS: dict[str, Department] = {
             icon="📚",
             advisor_role="社課規劃與教學設計顧問",
             focus=("學期社課規劃", "講師邀請", "課程內容與教案", "出席率與學習回饋"),
-            example_questions=(
-                "社課出席率越來越低，要怎麼提升？",
-                "幫我規劃一學期 12 堂的初學者社課",
-            ),
+            example_questions=("社課出席率越來越低，要怎麼提升？", "幫我規劃一學期 12 堂的初學者社課"),
+            details_hint="例：社課每週四晚上；講師費每堂 1,500 元；學員多為零基礎",
+        ),
+        Department(
+            key="venue",
+            name="總務（場地、器材）",
+            icon="🏛️",
+            advisor_role="場地租借與總務顧問",
+            focus=("場地申請流程與時程", "場地選擇與動線", "器材與物資清點", "場地使用規範"),
+            example_questions=("期末成果展要借哪種場地？大概多久前要申請？", "社辦器材常常找不到，要怎麼管理借還？"),
+            details_hint="例：社辦在學生活動中心 3 樓；常借場地為小福樓會議室；器材有相機 3 台、腳架 5 支",
+        ),
+        Department(
+            key="design",
+            name="美宣",
+            icon="🎨",
+            advisor_role="社團視覺設計與美宣顧問",
+            focus=("海報與貼文設計需求", "品牌視覺規範", "設計排程", "印刷與輸出"),
+            example_questions=("成果展海報要怎麼寫設計需求給美宣？", "我們社團需要一份視覺規範，要包含什麼？"),
+            details_hint="例：主色 #1F3A5F、輔色米白；字體用思源黑體；海報需提前兩週完成",
+        ),
+        Department(
+            key="members",
+            name="人資／社員",
+            icon="👥",
+            advisor_role="社團人資與組織發展顧問",
+            focus=("招生與面試流程", "社員參與與留任", "幹部培訓", "交接手冊"),
+            example_questions=("新社員參加幾次就不來了，要怎麼提升留任？", "幹部交接要準備哪些文件？"),
+            details_hint="例：社員約 60 人；幹部任期一年，每年 6 月交接；社費一學期 500 元",
         ),
     ]
 }
 
+# 新社團預設啟用的部門；其他部門可在設定中開啟
+DEFAULT_ENABLED = ("president", "marketing", "pr", "finance", "events", "minutes")
+
 DEPARTMENT_KB_DIR = DEFAULT_KB_DIR / "departments"
 SHARED_KB_FILES = ("04_campus_promotion_guidelines.md",)
+
+
+class DepartmentConfig(BaseModel):
+    enabled: bool = False
+    display_name: str = Field(default="", description="社團自訂的部門名稱，空白時使用預設名稱")
+    details: str = Field(default="", description="部門細節，AI 會參考")
+
+
+class ClubSettings(BaseModel):
+    departments: dict[str, DepartmentConfig] = Field(default_factory=dict)
+
+    @classmethod
+    def default(cls, enabled: tuple[str, ...] | list[str] = DEFAULT_ENABLED) -> ClubSettings:
+        return cls(departments={k: DepartmentConfig(enabled=k in enabled) for k in DEPARTMENTS})
+
+    def config(self, key: str) -> DepartmentConfig:
+        return self.departments.get(key) or DepartmentConfig()
+
+    def enabled_keys(self) -> list[str]:
+        """依 DEPARTMENTS 的順序列出已啟用的部門。"""
+        return [k for k in DEPARTMENTS if self.config(k).enabled]
+
+    def name(self, key: str) -> str:
+        cfg = self.config(key)
+        if cfg.display_name.strip():
+            return cfg.display_name.strip()
+        return DEPARTMENTS[key].name if key in DEPARTMENTS else key
+
+    def label(self, key: str) -> str:
+        d = DEPARTMENTS.get(key)
+        if d is None:
+            return key
+        return f"{d.icon} {self.name(key)}{'（測試版）' if d.beta else ''}"
+
+    def details(self, key: str) -> str:
+        return self.config(key).details.strip()
+
+    def all_details_text(self) -> str:
+        """給 AI 參考的全社團部門設定摘要。"""
+        lines = []
+        for k in self.enabled_keys():
+            detail = self.details(k)
+            lines.append(f"- {self.name(k)}：{detail or '（未填寫細節）'}")
+        return "\n".join(lines)
 
 
 def get_department(key: str) -> Department:
@@ -128,7 +200,7 @@ def department_retriever(key: str, kb_dir: Path = DEFAULT_KB_DIR) -> BM25Retriev
     if key == "marketing":
         return BM25Retriever.from_directory(kb_dir)
     chunks: list[Chunk] = []
-    for path in sorted((kb_dir / "departments").glob(f"{key}*.md")):
+    for path in sorted((kb_dir / "departments").glob(f"{key}.md")):
         chunks.extend(split_markdown(path.name, path.read_text(encoding="utf-8")))
     for name in SHARED_KB_FILES:
         path = kb_dir / name

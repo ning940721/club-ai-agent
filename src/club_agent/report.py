@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .schemas import Advice, CampaignResult, DiagnosisReport
+from .schemas import Advice, CampaignResult, DiagnosisReport, MeetingAnswer, MeetingSummary, ProgressBrief
 
 
 def _cell(text: object) -> str:
@@ -95,4 +95,50 @@ def advice_markdown(department_name: str, question: str, advice: Advice) -> str:
         out += ["", "## 注意事項", *[f"- {r}" for r in advice.risks]]
     if advice.info_needed:
         out += ["", "## 補充這些資訊，建議會更精準", *[f"- {i}" for i in advice.info_needed]]
+    return "\n".join(out) + "\n"
+
+
+def meeting_summary_markdown(title: str, meeting_date: str, s: MeetingSummary, dept_name=lambda k: k) -> str:
+    out = [f"# {title}（{meeting_date}）", "", "## 重點摘要", s.summary]
+    if s.decisions:
+        out += ["", "## 決議", *[f"- {d}" for d in s.decisions]]
+    if s.action_items:
+        out += ["", "## 待辦事項", "| 事項 | 負責人 | 部門 | 期限 |", "|---|---|---|---|"]
+        out += [
+            f"| {_cell(a.task)} | {_cell(a.owner or '—')} | {_cell(dept_name(a.department))} | {_cell(a.due or '—')} |"
+            for a in s.action_items
+        ]
+    if s.key_dates:
+        out += ["", "## 重要日期"]
+        out += [f"- **{k.date}** {' '.join(x for x in (k.time, k.location) if x)}｜{k.event}" for k in s.key_dates]
+    if s.open_questions:
+        out += ["", "## 待討論", *[f"- {q}" for q in s.open_questions]]
+    return "\n".join(out) + "\n"
+
+
+def meeting_answer_markdown(question: str, a: MeetingAnswer) -> str:
+    out = [f"**Q：{question}**", "", f"**A：** {a.answer}"]
+    if a.sources:
+        out += ["", "依據："]
+        out += [f"- {src.date}｜{src.title}：「{src.excerpt}」" for src in a.sources]
+    return "\n".join(out) + "\n"
+
+
+def progress_brief_markdown(club_name: str, today: str, b: ProgressBrief) -> str:
+    out = [f"# {club_name} 進度彙整與會議議程（{today}）", "", "## 總覽", b.overview, "", "## 各部門進度"]
+    for d in b.departments:
+        out += ["", f"### {d.department}", d.progress]
+        out += [f"- 進行中：{x}" for x in d.doing]
+        out += [f"- ⚠️ {x}" for x in d.blockers]
+    if b.agenda:
+        total = sum(a.minutes for a in b.agenda)
+        out += ["", f"## 下次會議議程（約 {total} 分鐘）", "| # | 議題 | 類型 | 部門 | 時間 | 目標 |", "|---|---|---|---|---|---|"]
+        out += [
+            f"| {i} | {_cell(a.topic)} | {a.kind} | {_cell(a.department)} | {a.minutes} 分 | {_cell(a.goal)} |"
+            for i, a in enumerate(b.agenda, 1)
+        ]
+    if b.decisions_needed:
+        out += ["", "## 需要決定的事", *[f"- {x}" for x in b.decisions_needed]]
+    if b.reminders:
+        out += ["", "## 近期提醒", *[f"- {x}" for x in b.reminders]]
     return "\n".join(out) + "\n"

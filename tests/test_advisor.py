@@ -18,10 +18,23 @@ def make_advice() -> Advice:
 
 
 def test_departments_defined():
-    assert [d.name for d in DEPARTMENTS.values()] == ["行銷", "公關", "財務", "活動", "場地", "會議記錄", "課程"]
+    assert list(DEPARTMENTS) == ["president", "marketing", "pr", "finance", "events", "minutes", "courses", "venue", "design", "members"]
     assert not get_department("marketing").beta
     assert all(d.beta for k, d in DEPARTMENTS.items() if k != "marketing")
     assert get_department("finance").label.endswith("（測試版）")
+    assert all(d.details_hint for d in DEPARTMENTS.values())
+
+
+def test_club_settings_names_and_details():
+    from club_agent.departments import DEFAULT_ENABLED, ClubSettings, DepartmentConfig
+
+    s = ClubSettings.default()
+    assert s.enabled_keys() == list(DEFAULT_ENABLED)
+    s.departments["finance"] = DepartmentConfig(enabled=True, display_name="財務長", details="500 元以上需社長核准")
+    assert s.name("finance") == "財務長" and s.name("pr") == "公關"
+    assert s.label("finance") == "💰 財務長（測試版）"
+    assert "500 元以上需社長核准" in s.all_details_text()
+    assert "課程" not in s.all_details_text()  # 未啟用的部門不列入
 
 
 def test_every_department_has_knowledge():
@@ -39,12 +52,19 @@ def test_finance_retriever_finds_budget_knowledge():
 
 
 def test_advisor_prompt_includes_role_activity_and_knowledge(club):
+    from club_agent.departments import ClubSettings, DepartmentConfig
+
+    settings = ClubSettings.default()
+    settings.departments["finance"] = DepartmentConfig(enabled=True, display_name="財務長", details="每月 5 號撥款")
     llm = FakeLLM({Advice: [make_advice()]})
     dept = get_department("finance")
-    advice = DepartmentAdvisor(llm, department_retriever("finance")).run(club, dept, "成果展預算怎麼分配？", "- 行銷｜宣傳企劃")
+    advice = DepartmentAdvisor(llm, department_retriever("finance")).run(
+        club, dept, "成果展預算怎麼分配？", "- 行銷｜宣傳企劃", settings, "- 待辦｜編列預算"
+    )
     assert advice.summary == "先做預算表"
     system, user, _ = llm.calls[0]
-    assert "預算健檢顧問" in system and "財務" in system
+    assert "預算健檢顧問" in system and "財務長" in system
+    assert "每月 5 號撥款" in user and "- 待辦｜編列預算" in user
     assert "成果展預算怎麼分配？" in user
     assert "- 行銷｜宣傳企劃" in user
     assert "finance.md" in user
