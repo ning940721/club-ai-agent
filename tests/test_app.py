@@ -449,7 +449,7 @@ def test_speakers_department_flow(monkeypatch):
     _button(at, "產生").click().run()
     assert not at.exception
     assert any(t.value == "講座邀請：手機街拍" for t in at.text_input)
-    _button(at, "存到這場講座的紀錄").click().run()
+    _button(at, "存到往來紀錄").click().run()
     assert any("進度改為已邀請" in s.value for s in at.success)
 
 
@@ -493,3 +493,32 @@ def test_event_project_flow(monkeypatch):
     store = LocalClubStore(os.environ["CLUB_AGENT_DATA_DIR"])  # 籌備工作是全社團待辦，行銷部門看得到
     tasks = list_tasks(store, at.session_state.club_id, "marketing")
     assert [t.title for t in tasks] == ["IG 宣傳貼文"] and tasks[0].source == "活動「期末成果展」"
+
+
+def test_pr_partners_ideas_and_letters(monkeypatch):
+    from club_agent.schemas import Letter, SponsorIdea, SponsorIdeas
+
+    fakes = {
+        SponsorIdeas: SponsorIdeas(ideas=[SponsorIdea(target_type="學校周邊飲料店", why="受眾重疊", ask="50 杯飲料",
+                                                      offer="IG 貼文 2 篇", search_keywords=["公館 飲料店"])], tips=["提早聯絡"]),
+        Letter: Letter(subject="【攝影社成果展】贊助邀請", body="您好……", short_text="短版"),
+    }
+    original = GeminiLLM.structured
+    monkeypatch.setattr(GeminiLLM, "structured", lambda self, system, user, output_type: (
+        fakes[output_type] if output_type in fakes else original(self, system, user, output_type)))
+    at = _app()
+    _signup(at)
+    _switch(at, "pr")
+    assert "合作與贊助" in [t.label for t in at.tabs]
+    _button(at, "建議贊助對象").click().run()
+    assert any("學校周邊飲料店" in m.value for m in at.markdown)
+
+    _input(at, "單位／店家名稱＊").input("好喝飲料")
+    _input(at, "聯絡方式").input("drink@example.com")
+    _button(at, "加入名單").click().run()
+    assert any("已新增「好喝飲料」" in s.value for s in at.success)
+
+    _button(at, "產生").click().run()
+    assert any(t.value == "【攝影社成果展】贊助邀請" for t in at.text_input)
+    _button(at, "存到往來紀錄").click().run()
+    assert any("進度改為已聯絡" in s.value for s in at.success)

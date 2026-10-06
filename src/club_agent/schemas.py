@@ -359,3 +359,21 @@ class EventReport(BaseModel):
     feedback_summary: str = Field(description="參加者回饋重點")
     improvements: list[str] = Field(description="檢討與下次改進建議，要具體")
     handover: list[str] = Field(description="給下一屆辦同樣活動的交接重點")
+
+
+# ---------------------------------------------------------------------------
+# 公關：贊助對象建議
+# ---------------------------------------------------------------------------
+
+
+class SponsorIdea(BaseModel):
+    target_type: str = Field(description="對象類型，例如：學校周邊早午餐店、相機器材行、系友創業的品牌；不要寫具體店名")
+    why: str = Field(description="為什麼適合：受眾重疊或品牌調性")
+    ask: str = Field(description="建議請求的內容與合理規模，例如：物資贊助 30 份飲料、現金 2,000–5,000 元")
+    offer: str = Field(description="我們可以提供的回饋，要具體可量化")
+    search_keywords: list[str] = Field(description="2–3 組可以在 Google 地圖或 IG 搜尋的關鍵字，含地區")
+
+
+class SponsorIdeas(BaseModel):
+    ideas: list[SponsorIdea] = Field(description="5–8 個建議，依成功機率由高到低")
+    tips: list[str] = Field(description="這次接洽的注意事項（3–5 點）")

@@ -24,6 +24,7 @@ from club_agent.departments import (  # noqa: E402
     FEATURE_FINANCE,
     FEATURE_MARKETING,
     FEATURE_MEETINGS,
+    FEATURE_PR,
     FEATURE_PRESIDENT,
     FEATURE_SPEAKERS,
     ClubSettings,
@@ -37,6 +38,7 @@ from club_agent.web.context import AppContext  # noqa: E402
 from club_agent.web.style import inject_css, page_header, sidebar_brand  # noqa: E402
 from club_agent.web.marketing_pages import campaign_page, diagnosis_page  # noqa: E402
 from club_agent.web.meeting_pages import meetings_page  # noqa: E402
+from club_agent.web.pr_pages import pr_page  # noqa: E402
 from club_agent.web.president_pages import president_page  # noqa: E402
 from club_agent.web.speaker_pages import speakers_page  # noqa: E402
 
@@ -197,6 +199,8 @@ if FEATURE_MARKETING in features:
     pages += [("社群數據診斷", diagnosis_page), ("活動宣傳企劃", campaign_page)]
 if FEATURE_EVENTS in features:
     pages.append(("活動專案", events_page))
+if FEATURE_PR in features:
+    pages.append(("合作與贊助", pr_page))
 if FEATURE_FINANCE in features:
     pages.append(("財務管理", finance_page))
 if FEATURE_SPEAKERS in features:

@@ -17,6 +17,7 @@ from .retriever import DEFAULT_KB_DIR, BM25Retriever, Chunk, split_markdown
 FEATURE_PRESIDENT = "president_overview"
 FEATURE_MEETINGS = "meetings"
 FEATURE_MARKETING = "marketing_tools"
+FEATURE_PR = "pr_tools"  # 合作對象名單、贊助對象建議、對外信件
 FEATURE_EVENTS = "event_projects"  # 活動專案：企劃書、籌備清單、細流、回饋表單、成果報告
 FEATURE_SPEAKERS = "speaker_tools"  # 講座邀約、時間敲定、信件與宣傳通知
 FEATURE_FINANCE = "finance_tools"  # 財務管理（以財務密碼上鎖，財務與社長使用）
@@ -67,6 +68,7 @@ DEPARTMENTS: dict[str, Department] = {
             focus=("企業贊助提案", "公關信與合作邀約", "跨社團與校外合作", "贊助回饋與露出"),
             example_questions=("想找飲料店贊助成果展，提案信要怎麼寫？", "合作社團臨時退出聯展，要怎麼對外溝通？"),
             details_hint="例：常合作對象為校園周邊餐飲；贊助回饋可提供 IG 貼文與攤位；對外信件需副本給社長",
+            features=(FEATURE_PR,),
         ),
         Department(
             key="finance",

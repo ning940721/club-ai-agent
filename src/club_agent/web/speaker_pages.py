@@ -3,12 +3,10 @@
 from __future__ import annotations
 
 from datetime import date, datetime, time
-from urllib.parse import quote
 
 import pandas as pd
 import streamlit as st
 
-from ..agents import LetterWriter
 from ..finance import get_settings as finance_settings
 from ..speakers import (
     FORMATS,
@@ -24,6 +22,7 @@ from ..speakers import (
     talks_markdown,
 )
 from .context import AppContext, download_buttons
+from .letters import letter_workbench
 
 LETTER_KINDS = {
     "邀請信": "第一次邀請講者：介紹社團與來意，說明講座主題、對象與人數、形式，提出候選時間與講師費，請對方回覆意願與方便的時間",
@@ -195,54 +194,21 @@ def letters_section(ctx: AppContext, talks: list[Talk]) -> None:
         st.info("先到「新增講座」建立講座，才能產生信件。")
         return
     st.caption("AI 依講座資料撰寫信件；資料不足的地方會標示【待補】，寄出前請檢查並修改。")
-    c1, c2 = st.columns([3, 2])
-    ids = [t.id for t in active]
     by_id = {t.id: t for t in active}
-    talk_id = c1.selectbox("講座", ids, format_func=lambda i: f"{by_id[i].title()}（{by_id[i].stage}）", key="letter_talk")
-    kind = c2.selectbox("要寫什麼", list(LETTER_KINDS), key="letter_kind", help="、".join(f"{k}：{v[:18]}…" for k, v in LETTER_KINDS.items()))
-    st.caption(LETTER_KINDS[kind])
-    extra = st.text_input("補充要求（選填）", placeholder="例：講者是學長，語氣可以輕鬆一點；報名連結是 forms.gle/xxxx", key="letter_extra")
+    talk_id = st.selectbox("講座", list(by_id), format_func=lambda i: f"{by_id[i].title()}（{by_id[i].stage}）", key="letter_talk")
     talk = by_id[talk_id]
-    if st.button("產生", type="primary", key="letter_go"):
-        sender = ctx.settings.name("speakers")
-        letter = ctx.run_ai(f"撰寫{kind}中…", lambda llm, _s: LetterWriter(llm).run(ctx.club, sender, kind, LETTER_KINDS[kind], talk.facts(), extra))
-        if letter:
-            st.session_state.letter_draft = (talk.id, kind, letter)
-            st.session_state.letter_version = st.session_state.get("letter_version", 0) + 1
 
-    draft = st.session_state.get("letter_draft")
-    if not draft or draft[0] != talk.id or draft[1] != kind:
-        return
-    _, _, letter = draft
-    v = st.session_state.get("letter_version", 0)
-    st.divider()
-    subject = st.text_input("主旨", value=letter.subject, key=f"letter_subject_{v}")
-    body = st.text_area("內文（可以直接修改）", value=letter.body, height=320, key=f"letter_body_{v}")
-    short = st.text_area("LINE／簡訊短版", value=letter.short_text, height=100, key=f"letter_short_{v}")
-    c1, c2, c3 = st.columns(3)
-    if c1.button("存到這場講座的紀錄", key=f"letter_save_{v}"):
-        updated = talk.model_copy(update={"messages": [*talk.messages, SavedMessage(kind=kind, subject=subject, body=body, short_text=short)]})
+    def on_save(kind: str, message: SavedMessage) -> None:
+        updated = talk.model_copy(update={"messages": [*talk.messages, message]})
         if kind == "邀請信" and talk.stage == "待聯絡":
             updated = updated.model_copy(update={"stage": "已邀請"})
         save_talk(ctx.store, ctx.club_id, updated)
         _flash(f"已存到「{talk.title()}」的往來紀錄" + ("，進度改為已邀請" if updated.stage != talk.stage else ""))
-    if "@" in talk.contact and kind != "社員宣傳通知":
-        mail = f"mailto:{talk.contact}?subject={quote(subject)}&body={quote(body[:1500])}"
-        c2.link_button("用郵件程式開啟", mail, icon=":material/mail:")
-    elif kind != "社員宣傳通知":
-        c2.caption("填寫講者 Email 後，可以直接用郵件程式開啟。")
-    download_buttons(f"# {subject}\n\n{body}\n\n---\n\n**短版**\n\n{short}\n", f"{kind}_{talk.speaker}", f"letter_{v}")
-    if kind == "社員宣傳通知":
-        # 分享的是修改後的最新內容；換一份通知時重新開始
-        title = f"講座通知：{talk.topic}"
-        item = st.session_state.get("result_talk_notice")
-        if item is None or item.get("version") != v:
-            ctx.keep_result("talk_notice", "notice", title, short[:150], "", share=False, department="speakers")
-            item = st.session_state["result_talk_notice"]
-            item["version"] = v
-        if not item["shared"]:
-            item.update(markdown=f"# {subject}\n\n{body}\n", summary=short[:150])
-        ctx.share_controls("talk_notice")
+
+    letter_workbench(
+        ctx, f"talk_{talk.id}", LETTER_KINDS, talk.facts(), talk.contact, ctx.settings.name("speakers"), on_save,
+        notice_kinds=("社員宣傳通知",), download_name=talk.speaker, department="speakers",
+    )
 
 
 # ---------------------------------------------------------------------------
