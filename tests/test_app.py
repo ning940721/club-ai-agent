@@ -84,6 +84,12 @@ def _switch(at, dept):
     assert not at.exception
 
 
+def _open(at, page):
+    """打開側邊欄的頁面：feed、calendar、reimburse、settings、help。"""
+    at.button(key=f"side_{page}").click().run()
+    assert not at.exception
+
+
 def test_signup_lands_on_president_overview():
     at = _app()
     _signup(at)
@@ -123,7 +129,7 @@ def test_department_advice_shows_in_feed():
     _button(at, "取得建議").click().run()
     assert not at.exception
     assert any("先做預算表" in m.value for m in at.markdown)
-    _switch(at, "pr")
+    _open(at, "feed")
     assert any("成果展預算怎麼分配？" in m.value for m in at.markdown)
 
 
@@ -245,11 +251,18 @@ def test_signup_code_required(monkeypatch):
     assert any("邀請碼錯誤" in e.value for e in at.error)
 
 
-def test_advisor_feed_and_calendar_are_last_tabs():
+def test_shared_features_live_in_sidebar():
     at = _app()
     _signup(at)
     _switch(at, "marketing")
-    assert [t.label for t in at.tabs][-3:] == ["部門顧問", "社團動態", "行事曆"]
+    labels = [t.label for t in at.tabs]
+    assert labels[-1] == "部門顧問"
+    assert not {"社團動態", "行事曆", "報帳申請"} & set(labels)
+    for page, title in (("feed", "社團動態"), ("calendar", "行事曆"), ("reimburse", "報帳申請")):
+        _open(at, page)
+        assert title in _page_title(at)
+    _switch(at, "pr")  # 換部門時回到部門功能
+    assert "公關" in _page_title(at)
 
 
 def test_advice_not_shared_until_officer_chooses():
@@ -260,14 +273,14 @@ def test_advice_not_shared_until_officer_chooses():
     _input(at, "你的問題").input("成果展預算怎麼分配？")
     _button(at, "取得建議").click().run()
     assert any("先做預算表" in m.value for m in at.markdown)
-    _switch(at, "pr")
+    _open(at, "feed")
     assert not any("成果展預算怎麼分配？" in m.value for m in at.markdown)  # 沒有出現在社團動態
 
-    _switch(at, "finance")
+    _button(at, "返回部門功能").click().run()
     at.button(key="share_btn_advice_finance").click().run()
     assert not at.exception
     assert any("已分享到社團動態" in c.value for c in at.caption)
-    _switch(at, "pr")
+    _open(at, "feed")
     assert any("成果展預算怎麼分配？" in m.value for m in at.markdown)
 
 
@@ -290,7 +303,7 @@ def test_edited_template_agenda_can_be_shared():
     at.button(key="share_btn_brief").click().run()
     assert not at.exception
     assert any("已分享到社團動態" in c.value for c in at.caption)
-    _switch(at, "pr")
+    _open(at, "feed")
     assert any("幹部會議議程" in m.value for m in at.markdown)
 
 
@@ -299,6 +312,7 @@ def test_calendar_add_event_and_show_planned_meeting():
     _signup(at)
     _button(at, "使用基本議程（不使用 AI）").click().run()  # 排好的會議會出現在行事曆
     _switch(at, "pr")
+    _open(at, "calendar")
     _input(at, "行程名稱＊").input("贊助商拜訪")
     _button(at, "加入行事曆").click().run()
     assert not at.exception
@@ -357,6 +371,7 @@ def test_reimbursement_request_review_and_payment():
     _signup(at)
     _switch(at, "events")
     assert "財務管理" not in [t.label for t in at.tabs]  # 其他部門看不到財務
+    _open(at, "reimburse")
     _input(at, "申請人＊").input("小華")
     _input(at, "項目＊").input("成果展海報")
     next(n for n in at.number_input if n.label == "金額（元）＊").set_value(1500)
@@ -378,6 +393,7 @@ def test_reimbursement_request_review_and_payment():
     assert any(m.label == "本學期支出" and m.value == "1,500" for m in at.metric)
 
     _switch(at, "pr")  # 申請人用編號查詢進度
+    _open(at, "reimburse")
     _input(at, "報帳編號").input(code.lower())
     _button(at, "查詢").click().run()
     assert any("狀態：**已撥款**" in m.value for m in at.markdown)
@@ -395,11 +411,13 @@ def test_finance_pin_required_and_big_amount_needs_president():
 
     _input(at, "財務密碼").input("8888")
     _button(at, "進入").click().run()
+    _open(at, "reimburse")
     _input(at, "申請人＊").input("小明")
     _input(at, "項目＊").input("音響租借")
     next(n for n in at.number_input if n.label == "金額（元）＊").set_value(5000)
     _button(at, "送出申請").click().run()
     code = next(s.value for s in at.success if "報帳編號" in s.value).split("**")[1]
+    _button(at, "返回部門功能").click().run()
     at.button(key=f"rv_ok_{code}").click().run()
     assert any("需要社長同意" in e.value for e in at.error)
     at.checkbox(key=f"rv_pres_{code}").check()
