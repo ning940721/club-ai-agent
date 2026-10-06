@@ -138,8 +138,17 @@ class DepartmentConfig(BaseModel):
     details: str = Field(default="", description="部門細節，AI 會參考")
 
 
+class MeetingDefaults(BaseModel):
+    """幹部會議的固定時間與時長，社長頁面會自動帶入並記住上次的設定。"""
+
+    start: str = Field(default="19:00", description="開始時間 HH:MM")
+    minutes: int = Field(default=90, ge=10, le=480, description="會議時長（分鐘）")
+    location: str = ""
+
+
 class ClubSettings(BaseModel):
     departments: dict[str, DepartmentConfig] = Field(default_factory=dict)
+    meeting: MeetingDefaults = Field(default_factory=MeetingDefaults)
 
     @classmethod
     def default(cls, enabled: tuple[str, ...] | list[str] = DEFAULT_ENABLED) -> ClubSettings:

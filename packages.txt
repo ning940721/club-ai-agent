@@ -1,0 +1,2 @@
+# Streamlit Community Cloud 會用 apt 安裝這些系統套件：PDF 匯出需要中文字型
+fonts-noto-cjk

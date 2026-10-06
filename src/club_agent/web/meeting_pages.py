@@ -41,7 +41,10 @@ def ask_section(ctx: AppContext, docs: list[MeetingDoc]) -> None:
             st.warning("請先輸入問題")
         else:
             q = question.strip()
-            answer = ctx.run_ai("翻閱記錄中…", lambda llm, _s: MeetingQA(llm).run(q, docs, build_retriever(docs)))
+            # 問答只需要從記錄找答案，用最低思考程度回應最快
+            answer = ctx.run_ai(
+                "翻閱記錄中…", lambda llm, _s: MeetingQA(llm).run(q, docs, build_retriever(docs)), thinking="minimal"
+            )
             if answer:
                 history = st.session_state.setdefault("meeting_qa_history", [])
                 history.insert(0, meeting_answer_markdown(q, answer))
@@ -62,6 +65,8 @@ def add_section(ctx: AppContext) -> None:
     col_a, col_b = st.columns(2)
     summarize_clicked = col_a.button("整理重點並儲存", type="primary", key="m_summarize")
     save_only_clicked = col_b.button("只儲存，不整理（不使用 AI 額度）", key="m_save_only")
+    st.toggle("整理後把重點分享到社團動態", value=True, key="share_meeting",
+              help="記錄本身一定會存在「會議記錄」裡，可以提問；這個選項只決定重點要不要出現在社團動態")
     if not (summarize_clicked or save_only_clicked):
         return
     try:
@@ -83,12 +88,13 @@ def add_section(ctx: AppContext) -> None:
         summary = ctx.run_ai(
             "整理重點中…",
             lambda llm, _s: MeetingSummarizer(llm).run(ctx.settings, doc.title, doc.date, doc.source_type, doc.text),
-            "整理完成，已存入社團動態",
+            "整理完成",
         )
         if summary is None:
             return
         doc.summary = summary
-        ctx.save_record("meeting", doc.title, summary.summary[:150], _summary_md(ctx, doc), department="minutes")
+        if st.session_state.get("share_meeting", True):
+            ctx.save_record("meeting", doc.title, summary.summary[:150], _summary_md(ctx, doc), department="minutes")
     save_meeting(ctx.store, ctx.club_id, doc)
     st.session_state.last_meeting_id = doc.id
     st.success(f"已儲存「{doc.title}」")
@@ -125,7 +131,8 @@ def records_section(ctx: AppContext, docs: list[MeetingDoc]) -> None:
                 if summary:
                     doc.summary = summary
                     save_meeting(ctx.store, ctx.club_id, doc)
-                    ctx.save_record("meeting", doc.title, summary.summary[:150], _summary_md(ctx, doc), department="minutes")
+                    if st.session_state.get("share_meeting", True):
+                        ctx.save_record("meeting", doc.title, summary.summary[:150], _summary_md(ctx, doc), department="minutes")
                     st.rerun()
             if st.toggle("顯示原文", key=f"raw_{doc.id}"):
                 st.text(doc.text[:20000] + ("\n…（以下省略）" if len(doc.text) > 20000 else ""))

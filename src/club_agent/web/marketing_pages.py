@@ -11,7 +11,7 @@ from ..metrics import decode_csv_bytes, engagement_rate, parse_posts_csv, summar
 from ..report import campaign_markdown, diagnosis_markdown
 from ..retriever import BM25Retriever
 from ..workflow import MarketingWorkflow
-from .context import AppContext
+from .context import AppContext, download_buttons
 
 EXAMPLES = Path(__file__).resolve().parents[3] / "examples"
 
@@ -50,22 +50,27 @@ def diagnosis_page(ctx: AppContext) -> None:
             st.text(metrics.to_prompt_text())
 
         concern = st.text_area("目前的宣傳困擾（選填）", placeholder="例：最近三個月觸及一直掉，不知道該發什麼")
-        if st.button("開始診斷", type="primary"):
+        col_btn, col_share = st.columns([1, 3], vertical_alignment="center")
+        clicked = col_btn.button("開始診斷", type="primary")
+        with col_share:
+            share = ctx.share_toggle("diagnosis")
+        if clicked:
             report = ctx.run_ai(
                 "AI 顧問分析中…",
                 lambda llm, status: _workflow(llm, status).diagnose(ctx.club, metrics, concern),
-                "診斷完成，已存入社團動態",
+                "診斷完成",
             )
             if report:
                 md = diagnosis_markdown(ctx.club.name, report)
                 st.session_state.diagnosis = report
                 st.session_state.diagnosis_md = md
-                ctx.save_record("diagnosis", "社群數據診斷", report.summary[:150], md)
+                ctx.keep_result("diagnosis", "diagnosis", "社群數據診斷", report.summary[:150], md, share)
 
     if st.session_state.get("diagnosis_md"):
         st.divider()
         st.markdown(st.session_state.diagnosis_md)
-        st.download_button("下載診斷報告（.md）", st.session_state.diagnosis_md, file_name="診斷報告.md")
+        download_buttons(st.session_state.diagnosis_md, "社群數據診斷報告", "diagnosis")
+        ctx.share_controls("diagnosis")
 
 
 def campaign_page(ctx: AppContext) -> None:
@@ -84,7 +89,11 @@ def campaign_page(ctx: AppContext) -> None:
     use_diag = st.checkbox("參考「社群數據診斷」的結果", value=has_diag, disabled=not has_diag)
     rounds = st.slider("最多審查修訂輪數", 1, 3, 1, help="每多一輪就多呼叫 AI 兩次。輪數越多品質可能越好，但等待時間與用量也會增加")
 
-    if st.button("產生宣傳企劃", type="primary"):
+    col_btn, col_share = st.columns([1, 3], vertical_alignment="center")
+    clicked = col_btn.button("產生宣傳企劃", type="primary")
+    with col_share:
+        share = ctx.share_toggle("campaign")
+    if clicked:
         if not event_name.strip():
             st.warning("請先填寫活動名稱")
         else:
@@ -95,14 +104,15 @@ def campaign_page(ctx: AppContext) -> None:
             result = ctx.run_ai(
                 "AI 顧問撰寫中（約需 1–3 分鐘）…",
                 lambda llm, status: _workflow(llm, status, rounds).campaign(ctx.club, brief, diagnosis),
-                "企劃完成，已存入社團動態",
+                "企劃完成",
             )
             if result:
                 md = campaign_markdown(result)
                 st.session_state.campaign_md = md
-                ctx.save_record("campaign", event_name.strip(), result.plan.key_message[:150], md)
+                ctx.keep_result("campaign", "campaign", event_name.strip(), result.plan.key_message[:150], md, share)
 
     if st.session_state.get("campaign_md"):
         st.divider()
         st.markdown(st.session_state.campaign_md)
-        st.download_button("下載宣傳企劃（.md）", st.session_state.campaign_md, file_name="宣傳企劃.md")
+        download_buttons(st.session_state.campaign_md, "活動宣傳企劃", "campaign")
+        ctx.share_controls("campaign")

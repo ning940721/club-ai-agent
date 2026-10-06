@@ -2,18 +2,30 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 
 import pandas as pd
 import streamlit as st
 
+from ..agenda import (
+    KINDS,
+    AgendaRow,
+    meeting_description,
+    parse_time,
+    rows_from_items,
+    schedule,
+    schedule_markdown,
+    template_rows,
+    total_minutes,
+)
 from ..agents import ProgressReporter
+from ..departments import MeetingDefaults
 from ..meetings import list_meetings, recent_summaries_digest
 from ..report import progress_brief_markdown
 from ..store import activity_digest
 from ..tasks import department_progress, list_tasks, tasks_digest
 from .common_pages import add_task_form, tasks_table
-from .context import AppContext
+from .context import AppContext, demote_headings, download_buttons
 
 
 def upcoming_dates(ctx: AppContext, today: date) -> list[str]:
@@ -25,6 +37,148 @@ def upcoming_dates(ctx: AppContext, today: date) -> list[str]:
                     extra = " ".join(x for x in (k.time, k.location) if x)
                     rows.append((k.date, f"**{k.date}** {extra}｜{k.event}"))
     return [line for _, line in sorted(set(rows))]
+
+
+def meeting_inputs(ctx: AppContext, today: date) -> tuple[date, object, int, str]:
+    """會議日期、開始時間、時長與地點；時間、時長、地點會存成社團預設值，下次自動帶入。"""
+    saved = ctx.settings.meeting
+    c1, c2, c3, c4 = st.columns([2, 2, 2, 3])
+    meeting_date = c1.date_input("會議日期", value=today + timedelta(days=7), key="mt_date")
+    start = c2.time_input("開始時間", value=parse_time(saved.start), step=300, key="mt_start")
+    minutes = c3.number_input("會議時長（分鐘）", min_value=10, max_value=480, value=saved.minutes, step=10, key="mt_minutes")
+    location = c4.text_input("地點（選填）", value=saved.location, placeholder="例：社辦、線上 Google Meet", key="mt_location")
+    current = MeetingDefaults(start=f"{start:%H:%M}", minutes=int(minutes), location=location.strip())
+    if current != saved:
+        ctx.settings = ctx.settings.model_copy(update={"meeting": current})
+        ctx.store.update_settings(ctx.club_id, ctx.settings)
+    return meeting_date, start, int(minutes), location.strip()
+
+
+def set_agenda(rows: list[AgendaRow]) -> None:
+    st.session_state.agenda_rows = rows
+    st.session_state.agenda_version = st.session_state.get("agenda_version", 0) + 1  # 讓編輯表格重新載入
+
+
+def _text(value) -> str:
+    """表格新增的空白列會是 None／NaN。"""
+    return "" if value is None or pd.isna(value) else str(value).strip()
+
+
+def agenda_editor(rows: list[AgendaRow]) -> list[AgendaRow]:
+    """可新增、刪除、修改議題與分鐘數的表格；回傳修改後的議程。"""
+    df = pd.DataFrame(
+        {
+            "議題": [r.topic for r in rows],
+            "類型": [r.kind if r.kind in KINDS else "討論" for r in rows],
+            "負責": [r.department for r in rows],
+            "分鐘": [r.minutes for r in rows],
+            "目標": [r.goal for r in rows],
+        }
+    )
+    edited = st.data_editor(
+        df,
+        key=f"agenda_editor_{st.session_state.get('agenda_version', 0)}",
+        num_rows="dynamic",
+        hide_index=True,
+        width="stretch",
+        column_config={
+            "類型": st.column_config.SelectboxColumn(options=list(KINDS), required=True),
+            "分鐘": st.column_config.NumberColumn(min_value=0, max_value=480, step=5, required=True),
+        },
+    )
+    out = []
+    for row in edited.to_dict("records"):
+        if topic := _text(row["議題"]):
+            minutes = 0 if pd.isna(row["分鐘"]) else int(row["分鐘"])
+            out.append(AgendaRow(topic, minutes, _text(row["類型"]) or "討論", _text(row["負責"]), _text(row["目標"])))
+    return out
+
+
+def meeting_section(ctx: AppContext, tasks, records, today: date) -> None:
+    st.subheader("下次幹部會議")
+    st.caption("設定會議時間與時長，AI 會依各部門的待辦、社團動態與最近的會議記錄規劃議程，並排出每個議題的時段。")
+    meeting_date, start, minutes, location = meeting_inputs(ctx, today)
+
+    col_ai, col_template, col_share = st.columns([2, 2, 3], vertical_alignment="center")
+    clicked = col_ai.button("產生進度彙整與議程", type="primary", width="stretch")
+    with col_share:
+        share = ctx.share_toggle("brief")
+    if clicked:
+        meetings = list_meetings(ctx.store, ctx.club_id)
+        meeting_text = meeting_description(meeting_date, start, minutes, location)
+
+        def build(llm, _status):
+            return ProgressReporter(llm).run(
+                ctx.club,
+                ctx.settings,
+                tasks_digest(tasks, ctx.settings, today),
+                activity_digest(records[:40], limit=20, settings=ctx.settings),
+                recent_summaries_digest(meetings),
+                today,
+                meeting_text,
+            )
+
+        brief = ctx.run_ai("彙整各部門進度中…", build)
+        if brief:
+            rows = rows_from_items(brief.agenda)
+            set_agenda(rows)
+            st.session_state.progress_brief = brief
+            md = progress_brief_markdown(
+                ctx.club.name, today.isoformat(), brief, schedule_markdown(meeting_date, start, minutes, rows, location)
+            )
+            ctx.keep_result("brief", "brief", f"進度彙整與議程（{today.isoformat()}）", brief.overview[:150], md, share, "president")
+    if col_template.button("使用基本議程（不使用 AI）", width="stretch"):
+        names = [ctx.settings.name(k) for k in ctx.settings.enabled_keys() if k != "president"]
+        set_agenda(template_rows(minutes, names))
+        st.session_state.pop("progress_brief", None)
+        st.session_state.pop("result_brief", None)
+
+    rows = st.session_state.get("agenda_rows")
+    if rows is None:
+        return
+
+    st.markdown("**會議時間表**")
+    with st.expander("調整議程（修改議題、分鐘數，或在表格最下方新增一列；勾選列後可刪除）"):
+        rows = agenda_editor(rows)
+    used = total_minutes(rows)
+    table = pd.DataFrame(
+        {
+            "時間": [s.span for s in schedule(rows, start)],
+            "議題": [r.topic for r in rows],
+            "類型": [r.kind for r in rows],
+            "負責": [r.department for r in rows],
+            "分鐘": [r.minutes for r in rows],
+            "目標": [r.goal for r in rows],
+        }
+    )
+    st.dataframe(table, hide_index=True, width="stretch")
+    if used == minutes:
+        st.caption(f"共 {used} 分鐘，剛好符合預定時長。")
+    elif used < minutes:
+        st.caption(f"共 {used} 分鐘，比預定時長少 {minutes - used} 分鐘。")
+    else:
+        st.warning(f"議程共 {used} 分鐘，超過預定時長 {used - minutes} 分鐘，建議縮短部分議題。")
+
+    agenda_md = schedule_markdown(meeting_date, start, minutes, rows, location)
+    if brief := st.session_state.get("progress_brief"):
+        md = progress_brief_markdown(ctx.club.name, today.isoformat(), brief, agenda_md)
+        without_agenda = progress_brief_markdown(ctx.club.name, today.isoformat(), brief.model_copy(update={"agenda": []}))
+        with st.expander("進度彙整（各部門進度、需要決定的事、近期提醒）", expanded=True):
+            st.markdown(demote_headings(without_agenda, 1))
+        download_buttons(md, f"幹部會議議程_{meeting_date.isoformat()}", "meeting_brief")
+    else:
+        md = f"# {ctx.club.name} 幹部會議議程\n\n{agenda_md}"
+        download_buttons(md, f"幹部會議議程_{meeting_date.isoformat()}", "meeting_agenda")
+
+    # 還沒分享時，按「分享到社團動態」要分享修改後的最新議程，而不是 AI 剛產生的版本
+    item = st.session_state.get("result_brief")
+    if item is None:
+        title = f"幹部會議議程（{meeting_date.isoformat()}）"
+        summary = meeting_description(meeting_date, start, minutes, location)
+        ctx.keep_result("brief", "brief", title, summary, md, share=False, department="president")
+    elif not item["shared"]:
+        item["markdown"] = md
+    ctx.share_controls("brief")
 
 
 def president_page(ctx: AppContext) -> None:
@@ -69,29 +223,7 @@ def president_page(ctx: AppContext) -> None:
             st.caption("尚無日期。上傳會議記錄並整理重點後會自動出現。")
 
     st.divider()
-    st.subheader("進度彙整與會議議程")
-    st.caption("AI 會根據各部門的待辦、社團動態與最近的會議記錄，整理每個部門在做什麼、哪裡卡關，並規劃下次會議要討論的內容。")
-    if st.button("產生進度彙整與議程", type="primary"):
-        meetings = list_meetings(ctx.store, ctx.club_id)
-
-        def build(llm, _status):
-            return ProgressReporter(llm).run(
-                ctx.club,
-                ctx.settings,
-                tasks_digest(tasks, ctx.settings, today),
-                activity_digest(records[:40], limit=20, settings=ctx.settings),
-                recent_summaries_digest(meetings),
-                today,
-            )
-
-        brief = ctx.run_ai("彙整各部門進度中…", build, "完成，已存入社團動態")
-        if brief:
-            md = progress_brief_markdown(ctx.club.name, today.isoformat(), brief)
-            st.session_state.progress_md = md
-            ctx.save_record("brief", f"進度彙整與議程（{today.isoformat()}）", brief.overview[:150], md, department="president")
-    if md := st.session_state.get("progress_md"):
-        st.markdown(md)
-        st.download_button("下載（.md）", md, file_name="進度彙整與議程.md")
+    meeting_section(ctx, tasks, records, today)
 
     st.divider()
     st.subheader("全社團待辦")

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 
 from ..departments import ClubSettings
@@ -36,8 +37,9 @@ def department_codes(settings: ClubSettings) -> str:
 
 
 class MeetingSummarizer:
-    def __init__(self, llm: LLM):
+    def __init__(self, llm: LLM, max_workers: int = 3):
         self.llm = llm
+        self.max_workers = max_workers  # 很長的記錄會分段，各段同時送出以縮短等待時間
 
     def build_prompt(self, settings: ClubSettings, title: str, meeting_date: str, source_type: str, text: str, part: str = "") -> str:
         return f"""<departments>
@@ -52,11 +54,15 @@ class MeetingSummarizer:
 
     def run(self, settings: ClubSettings, title: str, meeting_date: str, source_type: str, text: str) -> MeetingSummary:
         parts = split_parts(text)
-        summaries = []
-        for i, part in enumerate(parts, 1):
-            label = f"{i}/{len(parts)}" if len(parts) > 1 else ""
-            prompt = self.build_prompt(settings, title, meeting_date, source_type, part, label)
-            summaries.append(self.llm.structured(SUMMARY_PROMPT, prompt, MeetingSummary))
+        prompts = [
+            self.build_prompt(settings, title, meeting_date, source_type, part, f"{i}/{len(parts)}" if len(parts) > 1 else "")
+            for i, part in enumerate(parts, 1)
+        ]
+        if len(prompts) == 1:
+            summaries = [self.llm.structured(SUMMARY_PROMPT, prompts[0], MeetingSummary)]
+        else:
+            with ThreadPoolExecutor(max_workers=min(self.max_workers, len(prompts))) as pool:
+                summaries = list(pool.map(lambda p: self.llm.structured(SUMMARY_PROMPT, p, MeetingSummary), prompts))
         summary = merge_summaries(summaries)
         enabled = set(settings.enabled_keys())
         fallback = "minutes" if "minutes" in enabled else settings.enabled_keys()[0]

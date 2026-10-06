@@ -92,6 +92,25 @@ def test_signup_lands_on_president_overview():
     _button(at, "產生進度彙整與議程").click().run()
     assert not at.exception
     assert any("各部門進度正常" in m.value for m in at.markdown)
+    schedule = at.dataframe[-1].value
+    assert schedule.loc[0, "時間"] == "19:00–19:20" and schedule.loc[0, "議題"] == "贊助進度"
+    assert any("比預定時長少 70 分鐘" in c.value for c in at.caption)
+
+
+def test_meeting_duration_is_remembered_and_template_agenda_needs_no_ai():
+    at = _app()
+    _signup(at)
+    at.number_input(key="mt_minutes").set_value(60).run()
+    _button(at, "使用基本議程（不使用 AI）").click().run()
+    assert not at.exception
+    schedule = at.dataframe[-1].value
+    assert schedule["分鐘"].sum() == 60 and schedule.loc[0, "時間"].startswith("19:00")
+    assert any("剛好符合預定時長" in c.value for c in at.caption)
+    at2 = _app()  # 重新整理後仍記得會議時長
+    at2.text_input[0].input("test-club")
+    at2.text_input[1].input("secret123")
+    at2.button[0].click().run()
+    assert at2.number_input(key="mt_minutes").value == 60
 
 
 def test_department_advice_shows_in_feed():
@@ -143,9 +162,26 @@ def test_meeting_summary_tasks_and_qa():
     assert any("2026-12-04" in m.value for m in at.markdown)  # 近期重要日期
 
 
+def _open_settings(at):
+    at.button(key="side_settings").click().run()
+    assert not at.exception
+    assert "社團設定" in _page_title(at)
+
+
+def test_settings_and_help_live_in_sidebar():
+    at = _app()
+    _signup(at)
+    assert "社團設定" not in [t.label for t in at.tabs]
+    at.button(key="side_help").click().run()
+    assert "使用說明" in _page_title(at)
+    _button(at, "返回部門功能").click().run()
+    assert "社長" in _page_title(at)
+
+
 def test_settings_enable_rename_and_details():
     at = _app()
     _signup(at)
+    _open_settings(at)
     at.checkbox(key="set_en_courses").check()
     at.text_input(key="set_name_finance").input("財務長")
     at.text_area(key="set_details_finance").input("500 元以上需社長核准")
@@ -162,6 +198,7 @@ def test_settings_enable_rename_and_details():
 def test_login_logout_and_change_password():
     at = _app()
     _signup(at, "club-x")
+    _open_settings(at)
     old = next(w for w in at.text_input if w.label == "目前的密碼")
     old.input("secret123")
     next(w for w in at.text_input if w.label == "新密碼（至少 6 個字元）").input("newpass123")
@@ -171,10 +208,14 @@ def test_login_logout_and_change_password():
 
     _button(at, "登出").click().run()
     assert len(at.tabs) == 2
+    # 以下改用新頁面登入：AppTest 登出後仍會去讀已消失的部門選單而出錯，實際網頁不會
+    at = _app()
     at.text_input[0].input("club-x")
     at.text_input[1].input("secret123")
     at.button[0].click().run()
     assert any("帳號或密碼錯誤" in e.value for e in at.error)
+    at = _app()
+    at.text_input[0].input("club-x")
     at.text_input[1].input("newpass123")
     at.button[0].click().run()
     assert "測試攝影社" in _page_title(at)
@@ -202,3 +243,52 @@ def test_signup_code_required(monkeypatch):
     _input(at, "設定社團帳號（英文或數字，例：ntu-photo）").input("x-club")
     _button(at, "建立帳號並登入").click().run()
     assert any("邀請碼錯誤" in e.value for e in at.error)
+
+
+def test_advisor_and_feed_are_last_tabs():
+    at = _app()
+    _signup(at)
+    _switch(at, "marketing")
+    assert [t.label for t in at.tabs][-2:] == ["部門顧問", "社團動態"]
+
+
+def test_advice_not_shared_until_officer_chooses():
+    at = _app()
+    _signup(at)
+    _switch(at, "finance")
+    at.toggle(key="share_advice_finance").set_value(False).run()
+    _input(at, "你的問題").input("成果展預算怎麼分配？")
+    _button(at, "取得建議").click().run()
+    assert any("先做預算表" in m.value for m in at.markdown)
+    _switch(at, "pr")
+    assert not any("成果展預算怎麼分配？" in m.value for m in at.markdown)  # 沒有出現在社團動態
+
+    _switch(at, "finance")
+    at.button(key="share_btn_advice_finance").click().run()
+    assert not at.exception
+    assert any("已分享到社團動態" in c.value for c in at.caption)
+    _switch(at, "pr")
+    assert any("成果展預算怎麼分配？" in m.value for m in at.markdown)
+
+
+def test_quick_qa_answers_from_club_records():
+    at = _app()
+    _signup(at)
+    _switch(at, "pr")
+    at.session_state["advisor_mode_pr"] = "快速問答"  # AppTest 尚不支援操作 segmented_control
+    at.run()
+    _button(at, "上次開會決定了什麼？").click().run()
+    next(b for b in at.button if b.label == "提問").click().run()
+    assert not at.exception
+    assert any("下次幹部會是 12/4 19:00" in m.value for m in at.markdown)
+
+
+def test_edited_template_agenda_can_be_shared():
+    at = _app()
+    _signup(at)
+    _button(at, "使用基本議程（不使用 AI）").click().run()
+    at.button(key="share_btn_brief").click().run()
+    assert not at.exception
+    assert any("已分享到社團動態" in c.value for c in at.caption)
+    _switch(at, "pr")
+    assert any("幹部會議議程" in m.value for m in at.markdown)

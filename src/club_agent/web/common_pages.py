@@ -7,13 +7,14 @@ from datetime import date
 import pandas as pd
 import streamlit as st
 
-from ..agents import DepartmentAdvisor
+from ..agents import ClubQA, DepartmentAdvisor, club_retriever
 from ..departments import DEPARTMENTS, ClubSettings, DepartmentConfig, department_retriever
-from ..report import advice_markdown
+from ..meetings import list_meetings
+from ..report import advice_markdown, meeting_answer_markdown
 from ..schemas import ClubProfile
 from ..store import StoreError, activity_digest
 from ..tasks import STATUSES, Task, delete_task, list_tasks, save_task, tasks_digest
-from .context import AppContext
+from .context import AppContext, download_buttons
 
 PLATFORMS = ["Instagram", "Facebook", "Dcard", "Threads"]
 
@@ -28,7 +29,57 @@ def get_department_retriever(key: str):
 # ---------------------------------------------------------------------------
 
 
+QA_EXAMPLES = ("上次開會決定了什麼？", "下次開會是什麼時候？", "目前有哪些逾期的任務？")
+MODE_QA, MODE_ADVICE = "快速問答", "顧問建議"
+
+
 def advisor_page(ctx: AppContext) -> None:
+    mode = st.segmented_control(
+        "想做什麼？",
+        [MODE_QA, MODE_ADVICE],
+        default=MODE_ADVICE,
+        key=f"advisor_mode_{ctx.dept_key}",
+        help="快速問答：從會議記錄、社團動態與待辦中直接找答案。顧問建議：針對狀況給行動步驟與可用的文件模板。",
+    )
+    if mode == MODE_QA:
+        quick_qa(ctx)
+    else:
+        advice_section(ctx)
+
+
+def quick_qa(ctx: AppContext) -> None:
+    st.caption("從社團的會議記錄、各部門紀錄與待辦中找答案，並附上出處。")
+    q_key = f"qa_question_{ctx.dept_key}"
+    cols = st.columns(len(QA_EXAMPLES))
+    for i, example in enumerate(QA_EXAMPLES):
+        if cols[i].button(example, key=f"qa_ex_{ctx.dept_key}_{i}", width="stretch"):
+            st.session_state[q_key] = example
+    with st.form(f"club_qa_{ctx.dept_key}", clear_on_submit=False, border=False):
+        question = st.text_input("想查什麼？", key=q_key, placeholder="例：成果展預算最後決定多少？")
+        submitted = st.form_submit_button("提問", type="primary")
+    if submitted:
+        if not question.strip():
+            st.warning("請先輸入問題")
+        else:
+            q = question.strip()
+
+            def ask(llm, _status):
+                docs = list_meetings(ctx.store, ctx.club_id)
+                records = ctx.store.list_records(ctx.club_id, limit=60)
+                tasks = tasks_digest(list_tasks(ctx.store, ctx.club_id), ctx.settings, date.today())
+                return ClubQA(llm).run(q, docs, club_retriever(docs, records, ctx.settings.name), tasks)
+
+            # 問答只需要從資料找答案，用最低思考程度回應最快
+            answer = ctx.run_ai("翻閱社團紀錄中…", ask, thinking="minimal")
+            if answer:
+                st.session_state.setdefault("club_qa_history", []).insert(0, meeting_answer_markdown(q, answer))
+    for i, md in enumerate(st.session_state.get("club_qa_history", [])):
+        if i:
+            st.divider()
+        st.markdown(md)
+
+
+def advice_section(ctx: AppContext) -> None:
     dept = ctx.dept
     st.caption("專長：" + "、".join(dept.focus))
     if dept.beta:
@@ -43,7 +94,12 @@ def advisor_page(ctx: AppContext) -> None:
             st.session_state[q_key] = example
     question = st.text_area("你的問題", key=q_key, height=120, placeholder="描述你遇到的狀況，越具體建議越準確")
 
-    if st.button("取得建議", type="primary"):
+    result_key = f"advice_{ctx.dept_key}"
+    col_btn, col_share = st.columns([1, 3], vertical_alignment="center")
+    clicked = col_btn.button("取得建議", type="primary")
+    with col_share:
+        share = ctx.share_toggle(result_key)
+    if clicked:
         if not question.strip():
             st.warning("請先輸入問題")
         else:
@@ -56,16 +112,16 @@ def advisor_page(ctx: AppContext) -> None:
                 advisor = DepartmentAdvisor(llm, get_department_retriever(ctx.dept_key))
                 return advisor.run(ctx.club, dept, q, activity, ctx.settings, dept_tasks)
 
-            advice = ctx.run_ai(f"{ctx.dept_name}顧問思考中…", ask, "完成，已存入社團動態")
+            advice = ctx.run_ai(f"{ctx.dept_name}顧問思考中…", ask)
             if advice:
                 md = advice_markdown(ctx.dept_name, q, advice)
-                ctx.save_record("advice", q[:60], advice.summary[:150], md)
-                st.session_state[f"advice_md_{ctx.dept_key}"] = md
+                ctx.keep_result(result_key, "advice", q[:60], advice.summary[:150], md, share)
 
-    if md := st.session_state.get(f"advice_md_{ctx.dept_key}"):
+    if item := st.session_state.get(f"result_{result_key}"):
         st.divider()
-        st.markdown(md)
-        st.download_button("下載建議（.md）", md, file_name=f"{ctx.dept_name}顧問建議.md")
+        st.markdown(item["markdown"])
+        download_buttons(item["markdown"], f"{ctx.dept_name}顧問建議", result_key)
+        ctx.share_controls(result_key)
 
     recent = ctx.store.list_records(ctx.club_id, department=ctx.dept_key, limit=5)
     if recent:
@@ -260,7 +316,7 @@ def department_settings_form(settings: ClubSettings) -> ClubSettings:
             name = st.text_input("部門名稱（空白則使用預設）", value=cfg.display_name, placeholder=d.name, key=f"set_name_{key}")
             details = st.text_area("部門細節", value=cfg.details, placeholder=d.details_hint, key=f"set_details_{key}")
         configs[key] = DepartmentConfig(enabled=enabled, display_name=name.strip(), details=details.strip())
-    return ClubSettings(departments=configs)
+    return settings.model_copy(update={"departments": configs})
 
 
 def settings_page(ctx: AppContext) -> None:
@@ -310,14 +366,17 @@ def help_page(csv_columns: list[str]) -> None:
         """
 ### 怎麼使用
 1. 在左側選擇**我的部門**。
-2. **部門顧問**：輸入問題（或點範例問題），取得行動步驟與可直接使用的文件模板。
-3. **待辦與進度**：記錄部門的任務、負責人與期限；社長可以在總覽看到全社團進度。
-4. **社團動態**：所有部門的成果都會存在這裡，彼此看得到。
+2. **待辦與進度**：記錄部門的任務、負責人與期限；社長可以在總覽看到全社團進度。
+3. **社團動態**（最後一個分頁）：各部門分享的成果都在這裡，彼此看得到。每次產生結果時可以選擇要不要分享。
+4. **部門顧問**：
+   - 快速問答：直接問社團的事，例如「上次開會決定了什麼？」，AI 會從會議記錄、社團動態與待辦找答案並附出處
+   - 顧問建議：描述遇到的狀況，取得行動步驟與可直接使用的文件模板
 5. 部分部門有專屬功能：
-   - 社長：各部門進度總覽、自動產生進度彙整與會議議程
+   - 社長：各部門進度總覽；設定會議時間與時長，自動產生進度彙整、議程與會議時間表
    - 會議記錄：上傳會議記錄或 LINE 對話，自動整理重點，還可以直接問問題
    - 行銷：社群數據診斷、活動宣傳企劃
-6. **社團設定**：選擇社團有哪些部門、改部門名稱、填寫部門細節、修改密碼。
+6. **社團設定**（左側選單下方）：選擇社團有哪些部門、改部門名稱、填寫部門細節、修改密碼。
+7. 所有報告都可以下載成 **Word** 或 **PDF**。
 
 ### 怎麼匯出 LINE 對話記錄
 在 LINE 聊天室右上角選單 →「設定」→「傳送聊天記錄」，存成 .txt 檔後到「會議記錄」上傳。

@@ -124,13 +124,16 @@ def meeting_answer_markdown(question: str, a: MeetingAnswer) -> str:
     return "\n".join(out) + "\n"
 
 
-def progress_brief_markdown(club_name: str, today: str, b: ProgressBrief) -> str:
+def progress_brief_markdown(club_name: str, today: str, b: ProgressBrief, agenda_md: str = "") -> str:
+    """agenda_md：已排好時間的會議時間表（見 agenda.schedule_markdown）；空白時用 AI 原始議程。"""
     out = [f"# {club_name} 進度彙整與會議議程（{today}）", "", "## 總覽", b.overview, "", "## 各部門進度"]
     for d in b.departments:
         out += ["", f"### {d.department}", d.progress]
         out += [f"- 進行中：{x}" for x in d.doing]
         out += [f"- 需要協助：{x}" for x in d.blockers]
-    if b.agenda:
+    if agenda_md:
+        out += ["", agenda_md.rstrip()]
+    elif b.agenda:
         total = sum(a.minutes for a in b.agenda)
         out += ["", f"## 下次會議議程（約 {total} 分鐘）", "| # | 議題 | 類型 | 部門 | 時間 | 目標 |", "|---|---|---|---|---|---|"]
         out += [

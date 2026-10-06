@@ -119,13 +119,24 @@ enabled = settings.enabled_keys()
 if st.session_state.get("dept") not in enabled:
     st.session_state.dept = enabled[0]
 
+# 社團設定與使用說明不常用，放在側邊欄下方；點選後主畫面改顯示該頁，選部門或按「返回」回到部門功能
+SIDE_PAGES = {"settings": ("社團設定", ":material/settings:"), "help": ("使用說明", ":material/help:")}
+
+
+def open_side_page(name: str | None) -> None:
+    st.session_state.side_page = name
+
+
 with st.sidebar:
     sidebar_brand(club.name)
-    dept_key = st.selectbox("我的部門", enabled, format_func=settings.label, key="dept")
-    if st.button("登出", width="stretch"):
+    dept_key = st.selectbox("我的部門", enabled, format_func=settings.label, key="dept", on_change=open_side_page, args=(None,))
+    usage_slot = st.empty()  # 在頁面最後更新，才會算到這次按下的按鈕
+    st.divider()
+    for name, (label, icon) in SIDE_PAGES.items():
+        st.button(label, icon=icon, type="tertiary", key=f"side_{name}", on_click=open_side_page, args=(name,))
+    if st.button("登出", icon=":material/logout:", type="tertiary"):
         st.session_state.clear()
         st.rerun()
-    usage_slot = st.empty()  # 在頁面最後更新，才會算到這次按下的按鈕
 
 ctx = AppContext(
     store=store,
@@ -140,6 +151,16 @@ ctx = AppContext(
 )
 features = DEPARTMENTS[dept_key].features
 
+if side_page := st.session_state.get("side_page"):
+    page_header(SIDE_PAGES[side_page][0], club.name)
+    st.button("返回部門功能", icon=":material/arrow_back:", on_click=open_side_page, args=(None,))
+    if side_page == "settings":
+        settings_page(ctx)
+    else:
+        help_page(CSV_COLUMNS)
+    usage_slot.caption(f"本次已使用 {st.session_state.get('runs', 0)} / {ctx.max_runs} 次")
+    st.stop()
+
 page_header(ctx.dept_name, club.name, beta=DEPARTMENTS[dept_key].beta)
 if not API_KEY:
     st.error("網站尚未設定 GEMINI_API_KEY，請管理者到 Secrets 設定（見 docs/deploy.md）。")
@@ -149,16 +170,11 @@ if FEATURE_PRESIDENT in features:
     pages.append(("社團總覽", president_page))
 if FEATURE_MEETINGS in features:
     pages.append(("會議記錄", meetings_page))
-pages.append(("部門顧問", advisor_page))
 if FEATURE_MARKETING in features:
     pages += [("社群數據診斷", diagnosis_page), ("活動宣傳企劃", campaign_page)]
 if FEATURE_PRESIDENT not in features:
     pages.append(("待辦與進度", tasks_page))
-pages += [
-    ("社團動態", feed_page),
-    ("社團設定", settings_page),
-    ("使用說明", lambda _ctx: help_page(CSV_COLUMNS)),
-]
+pages += [("部門顧問", advisor_page), ("社團動態", feed_page)]
 
 for tab, (_, render) in zip(st.tabs([name for name, _ in pages]), pages):
     with tab:

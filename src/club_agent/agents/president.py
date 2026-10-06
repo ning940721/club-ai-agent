@@ -14,7 +14,8 @@ SYSTEM_PROMPT = """你是學生社團社長的幕僚，負責掌握各部門進�
 - 只根據提供的任務、紀錄與會議重點整理，不要捏造進度。
 - 每個啟用的部門都要列出；沒有資料的部門寫「目前沒有紀錄」，並建議請該部門更新進度。
 - 逾期、卡關或需要其他部門配合的事項放在 blockers，並在議程中安排討論。
-- 議程順序：上次待辦追蹤 → 需要決議的事項 → 各部門報告 → 其他；總長度控制在 60–90 分鐘。
+- 議程順序：上次待辦追蹤 → 需要決議的事項 → 各部門報告 → 其他。
+- 議程各項分鐘數加總必須等於 <meeting> 指定的會議時長；時間不夠時優先保留需要決議的事項，報告類可以縮短或合併。
 - 全部使用繁體中文。"""
 
 
@@ -30,8 +31,11 @@ class ProgressReporter:
         records_text: str,
         meetings_text: str,
         today: date,
+        meeting_text: str = "",
     ) -> str:
         return f"""<today>{today.isoformat()}</today>
+
+<meeting>{meeting_text or "會議時長 90 分鐘"}</meeting>
 
 <club>{club.name}：{club.positioning}</club>
 
@@ -61,6 +65,7 @@ class ProgressReporter:
         records_text: str,
         meetings_text: str,
         today: date | None = None,
+        meeting_text: str = "",
     ) -> ProgressBrief:
-        prompt = self.build_prompt(club, settings, tasks_text, records_text, meetings_text, today or date.today())
+        prompt = self.build_prompt(club, settings, tasks_text, records_text, meetings_text, today or date.today(), meeting_text)
         return self.llm.structured(SYSTEM_PROMPT, prompt, ProgressBrief)
