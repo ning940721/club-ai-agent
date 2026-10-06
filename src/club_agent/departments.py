@@ -17,6 +17,7 @@ from .retriever import DEFAULT_KB_DIR, BM25Retriever, Chunk, split_markdown
 FEATURE_PRESIDENT = "president_overview"
 FEATURE_MEETINGS = "meetings"
 FEATURE_MARKETING = "marketing_tools"
+FEATURE_FINANCE = "finance_tools"  # 財務管理（以財務密碼上鎖，財務與社長使用）
 
 
 @dataclass(frozen=True)
@@ -45,7 +46,7 @@ DEPARTMENTS: dict[str, Department] = {
             focus=("各部門進度掌握", "會議議程規劃", "組織分工與決策", "社團年度規劃"),
             example_questions=("幹部之間分工不清楚，要怎麼重新安排？", "這學期的社團目標要怎麼訂？"),
             details_hint="例：幹部會每兩週一次；重大決策需幹部會過半同意；本學期目標是招到 40 位新社員",
-            features=(FEATURE_PRESIDENT,),
+            features=(FEATURE_PRESIDENT, FEATURE_FINANCE),
         ),
         Department(
             key="marketing",
@@ -72,6 +73,7 @@ DEPARTMENTS: dict[str, Department] = {
             focus=("活動預算編列", "記帳與核銷流程", "社費與收支控管", "財務透明與交接"),
             example_questions=("成果展預算 3 萬元，要怎麼分配比較合理？", "社費收支一直對不起來，記帳流程該怎麼改？"),
             details_hint="例：報帳需附發票正本與活動名稱；500 元以上需社長核准；每月 5 號統一撥款",
+            features=(FEATURE_FINANCE,),
         ),
         Department(
             key="events",

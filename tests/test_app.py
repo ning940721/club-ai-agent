@@ -341,3 +341,67 @@ def test_meeting_record_is_checked_against_agenda_and_follow_up_shown(monkeypatc
     _switch(at, "president")
     assert any("上次會議議程追蹤" in m.value for m in at.markdown)
     assert any("討論與決議事項：已討論、未決議" in m.value for m in at.markdown)
+
+
+def _unlock_finance(at, pin="8888"):
+    pin_inputs = [w for w in at.text_input if w.label in ("設定財務密碼（至少 4 個字元）", "再輸入一次", "財務密碼")]
+    for w in pin_inputs:
+        w.input(pin)
+    label = "設定並進入" if len(pin_inputs) == 2 else "進入"
+    _button(at, label).click().run()
+    assert not at.exception
+
+
+def test_reimbursement_request_review_and_payment():
+    at = _app()
+    _signup(at)
+    _switch(at, "events")
+    assert "財務管理" not in [t.label for t in at.tabs]  # 其他部門看不到財務
+    _input(at, "申請人＊").input("小華")
+    _input(at, "項目＊").input("成果展海報")
+    next(n for n in at.number_input if n.label == "金額（元）＊").set_value(1500)
+    _input(at, "發票號碼").input("AB12345678")
+    _button(at, "送出申請").click().run()
+    assert not at.exception
+    message = next(s.value for s in at.success if "報帳編號" in s.value)
+    code = message.split("**")[1]
+
+    _switch(at, "finance")
+    assert "財務管理" in [t.label for t in at.tabs]
+    assert any("請先設定**財務密碼**" in i.value for i in at.info)
+    _unlock_finance(at)
+    assert any(code in m.value and "1,500 元" in m.value for m in at.markdown)
+    at.button(key=f"rv_ok_{code}").click().run()
+    assert not at.exception
+    _button(at, "標記為已撥款").click().run()
+    assert any("已標記 1 筆為已撥款" in s.value for s in at.success)
+    assert any(m.label == "本學期支出" and m.value == "1,500" for m in at.metric)
+
+    _switch(at, "pr")  # 申請人用編號查詢進度
+    _input(at, "報帳編號").input(code.lower())
+    _button(at, "查詢").click().run()
+    assert any("狀態：**已撥款**" in m.value for m in at.markdown)
+
+
+def test_finance_pin_required_and_big_amount_needs_president():
+    at = _app()
+    _signup(at)
+    _switch(at, "finance")
+    _unlock_finance(at)
+    _button(at, "鎖定").click().run()
+    _input(at, "財務密碼").input("0000")
+    _button(at, "進入").click().run()
+    assert any("財務密碼錯誤" in e.value for e in at.error)
+
+    _input(at, "財務密碼").input("8888")
+    _button(at, "進入").click().run()
+    _input(at, "申請人＊").input("小明")
+    _input(at, "項目＊").input("音響租借")
+    next(n for n in at.number_input if n.label == "金額（元）＊").set_value(5000)
+    _button(at, "送出申請").click().run()
+    code = next(s.value for s in at.success if "報帳編號" in s.value).split("**")[1]
+    at.button(key=f"rv_ok_{code}").click().run()
+    assert any("需要社長同意" in e.value for e in at.error)
+    at.checkbox(key=f"rv_pres_{code}").check()
+    at.button(key=f"rv_ok_{code}").click().run()
+    assert any("已核准、待撥款（1 筆，共 5,000 元）" in m.value for m in at.markdown)

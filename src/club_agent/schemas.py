@@ -269,3 +269,14 @@ class ProgressBrief(BaseModel):
     agenda: list[AgendaItem] = Field(description="下次會議建議議程，依討論順序排列")
     decisions_needed: list[str] = Field(description="需要社長或幹部會做決定的事項")
     reminders: list[str] = Field(description="近期重要日期與提醒")
+
+
+# ---------------------------------------------------------------------------
+# 財務
+# ---------------------------------------------------------------------------
+
+
+class FinanceReview(BaseModel):
+    summary: str = Field(description="這段期間財務狀況的總結（2–4 句）")
+    warnings: list[str] = Field(description="需要注意的地方，例如超支、待撥款累積、收入不足；沒有時為空")
+    suggestions: list[str] = Field(description="具體可執行的改善建議（3–5 點）")
