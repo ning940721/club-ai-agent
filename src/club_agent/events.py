@@ -19,11 +19,13 @@ from pydantic import BaseModel, Field
 from .agenda import end_time, list_plans, parse_time
 from .departments import ClubSettings
 from .meetings import list_meetings
+from .speakers import ACTIVE_STAGES, list_talks
 from .tasks import list_tasks
 
 COLLECTION = "events"
 KINDS = ("活動", "會議", "截止", "其他")
 SOURCE_MANUAL, SOURCE_PLAN, SOURCE_MEETING, SOURCE_TASK = "自行新增", "會議議程", "會議記錄", "待辦期限"
+SOURCE_TALK = "講座"
 
 
 class CalendarEvent(BaseModel):
@@ -94,6 +96,23 @@ def club_events(store, club_id: str, settings: ClubSettings | None = None) -> li
                 CalendarEvent(
                     id=f"meeting-{doc.id}-{len(seen)}", date=k.date, title=k.event, time=k.time, kind="其他",
                     location=k.location, note=f"出自會議記錄「{doc.title}」", source=SOURCE_MEETING,
+                )
+            )
+
+    for talk in list_talks(store, club_id):
+        if talk.confirmed and talk.stage != "婉拒" and _valid_date(talk.confirmed.date):
+            events.append(
+                CalendarEvent(
+                    id=f"talk-{talk.id}", date=talk.confirmed.date, title=f"講座：{talk.topic}（{talk.speaker}）",
+                    time=talk.confirmed.start, end=talk.confirmed.end, kind="活動", department="speakers",
+                    location=talk.location, note=talk.format, source=SOURCE_TALK,
+                )
+            )
+        elif talk.stage in ACTIVE_STAGES and _valid_date(talk.follow_up):
+            events.append(
+                CalendarEvent(
+                    id=f"talk-follow-{talk.id}", date=talk.follow_up, title=f"追蹤講者：{talk.speaker}（{talk.stage}）",
+                    kind="截止", department="speakers", note=talk.topic, source=SOURCE_TALK,
                 )
             )
 

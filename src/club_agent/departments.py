@@ -17,6 +17,7 @@ from .retriever import DEFAULT_KB_DIR, BM25Retriever, Chunk, split_markdown
 FEATURE_PRESIDENT = "president_overview"
 FEATURE_MEETINGS = "meetings"
 FEATURE_MARKETING = "marketing_tools"
+FEATURE_SPEAKERS = "speaker_tools"  # 講座邀約、時間敲定、信件與宣傳通知
 FEATURE_FINANCE = "finance_tools"  # 財務管理（以財務密碼上鎖，財務與社長使用）
 
 
@@ -99,6 +100,15 @@ DEPARTMENTS: dict[str, Department] = {
             focus=("學期社課規劃", "講師邀請", "課程內容與教案", "出席率與學習回饋"),
             example_questions=("社課出席率越來越低，要怎麼提升？", "幫我規劃一學期 12 堂的初學者社課"),
             details_hint="例：社課每週四晚上；講師費每堂 1,500 元；學員多為零基礎",
+        ),
+        Department(
+            key="speakers",
+            name="講者",
+            advisor_role="講座企劃與講者邀約顧問",
+            focus=("尋找與邀請講者", "講座主題與時間敲定", "講者聯繫與接待", "講座宣傳與社員通知"),
+            example_questions=("想找業界攝影師來分享，要去哪裡找、怎麼開口邀請？", "講者臨時說不能來，要怎麼應變？"),
+            details_hint="例：每學期辦 3 場講座；講師費 2,000 元＋交通費實報；講座固定在週四晚上，地點為社辦或學活中心",
+            features=(FEATURE_SPEAKERS,),
         ),
         Department(
             key="venue",

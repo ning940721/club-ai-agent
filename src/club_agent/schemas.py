@@ -280,3 +280,14 @@ class FinanceReview(BaseModel):
     summary: str = Field(description="這段期間財務狀況的總結（2–4 句）")
     warnings: list[str] = Field(description="需要注意的地方，例如超支、待撥款累積、收入不足；沒有時為空")
     suggestions: list[str] = Field(description="具體可執行的改善建議（3–5 點）")
+
+
+# ---------------------------------------------------------------------------
+# 信件與通知（講者、公關共用）
+# ---------------------------------------------------------------------------
+
+
+class Letter(BaseModel):
+    subject: str = Field(description="信件主旨；社員通知則為貼文標題")
+    body: str = Field(description="完整內文，可直接寄出或貼上；未知資訊以【待補：…】標示")
+    short_text: str = Field(description="LINE／簡訊用的短版（150 字以內）")

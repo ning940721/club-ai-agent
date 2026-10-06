@@ -423,3 +423,30 @@ def test_finance_pin_required_and_big_amount_needs_president():
     at.checkbox(key=f"rv_pres_{code}").check()
     at.button(key=f"rv_ok_{code}").click().run()
     assert any("已核准、待撥款（1 筆，共 5,000 元）" in m.value for m in at.markdown)
+
+
+def test_speakers_department_flow(monkeypatch):
+    from club_agent.schemas import Letter
+
+    original = GeminiLLM.structured
+    monkeypatch.setattr(GeminiLLM, "structured", lambda self, system, user, output_type: (
+        Letter(subject="講座邀請：手機街拍", body="王老師您好……", short_text="短版") if output_type is Letter
+        else original(self, system, user, output_type)))
+    at = _app()
+    _signup(at)
+    _open(at, "settings")
+    at.checkbox(key="set_en_speakers").check()
+    _button(at, "儲存部門設定").click().run()
+    _switch(at, "speakers")
+    assert "講座管理" in [t.label for t in at.tabs]
+    _input(at, "講者姓名＊").input("王小明")
+    _input(at, "講座主題＊").input("手機街拍")
+    _input(at, "聯絡方式").input("ming@example.com")
+    _button(at, "新增講座").click().run()
+    assert any("已新增「王小明｜手機街拍」" in s.value for s in at.success)
+
+    _button(at, "產生").click().run()
+    assert not at.exception
+    assert any(t.value == "講座邀請：手機街拍" for t in at.text_input)
+    _button(at, "存到這場講座的紀錄").click().run()
+    assert any("進度改為已邀請" in s.value for s in at.success)

@@ -4,6 +4,7 @@ from .critic import CriticAgent
 from .diagnostic import DiagnosticAgent
 from .drafting import DraftingAgent
 from .finance import FinanceAnalyst
+from .letters import LetterWriter
 from .president import ProgressReporter
 from .secretary import MeetingQA, MeetingSummarizer
 
@@ -14,6 +15,7 @@ __all__ = [
     "DiagnosticAgent",
     "DraftingAgent",
     "FinanceAnalyst",
+    "LetterWriter",
     "MeetingQA",
     "MeetingSummarizer",
     "ProgressReporter",

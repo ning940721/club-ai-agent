@@ -24,6 +24,7 @@ from club_agent.departments import (  # noqa: E402
     FEATURE_MARKETING,
     FEATURE_MEETINGS,
     FEATURE_PRESIDENT,
+    FEATURE_SPEAKERS,
     ClubSettings,
 )
 from club_agent.store import LocalClubStore, StoreError  # noqa: E402
@@ -35,6 +36,7 @@ from club_agent.web.style import inject_css, page_header, sidebar_brand  # noqa:
 from club_agent.web.marketing_pages import campaign_page, diagnosis_page  # noqa: E402
 from club_agent.web.meeting_pages import meetings_page  # noqa: E402
 from club_agent.web.president_pages import president_page  # noqa: E402
+from club_agent.web.speaker_pages import speakers_page  # noqa: E402
 
 CSV_COLUMNS = ["date", "time", "platform", "post_type", "topic", "reach", "likes", "comments", "shares", "saves", "followers", "caption"]
 
@@ -193,6 +195,8 @@ if FEATURE_MARKETING in features:
     pages += [("社群數據診斷", diagnosis_page), ("活動宣傳企劃", campaign_page)]
 if FEATURE_FINANCE in features:
     pages.append(("財務管理", finance_page))
+if FEATURE_SPEAKERS in features:
+    pages.append(("講座管理", speakers_page))
 if FEATURE_PRESIDENT not in features:
     pages.append(("待辦與進度", tasks_page))
 

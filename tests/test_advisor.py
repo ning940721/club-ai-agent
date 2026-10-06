@@ -18,7 +18,7 @@ def make_advice() -> Advice:
 
 
 def test_departments_defined():
-    assert list(DEPARTMENTS) == ["president", "marketing", "pr", "finance", "events", "minutes", "courses", "venue", "design", "members"]
+    assert list(DEPARTMENTS) == ["president", "marketing", "pr", "finance", "events", "minutes", "courses", "speakers", "venue", "design", "members"]
     assert not get_department("marketing").beta
     assert all(d.beta for k, d in DEPARTMENTS.items() if k != "marketing")
     assert get_department("finance").label.endswith("（測試版）")
