@@ -29,6 +29,7 @@ class Task(BaseModel):
     status: Status = "待辦"
     note: str = ""
     source: str = Field(default="手動新增", description="來源，例如：手動新增、會議記錄「10/3 幹部會」")
+    project: str = Field(default="", description="所屬活動專案 id；活動籌備清單的任務會填這個")
     created_at: str = Field(default_factory=lambda: datetime.now().isoformat(timespec="seconds"))
     updated_at: str = Field(default_factory=lambda: datetime.now().isoformat(timespec="seconds"))
 

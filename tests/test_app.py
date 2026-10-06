@@ -1,5 +1,6 @@
 """網頁版冒煙測試：以假的 LLM 取代 Gemini，確認登入、各部門頁面與設定流程可以走完。"""
 
+import os
 from pathlib import Path
 
 import pytest
@@ -450,3 +451,45 @@ def test_speakers_department_flow(monkeypatch):
     assert any(t.value == "講座邀請：手機街拍" for t in at.text_input)
     _button(at, "存到這場講座的紀錄").click().run()
     assert any("進度改為已邀請" in s.value for s in at.success)
+
+
+def test_event_project_flow(monkeypatch):
+    from club_agent.schemas import EventProposal, EventReport, FeedbackForm, FeedbackQuestion
+    from test_projects import make_proposal
+
+    fakes = {
+        EventProposal: make_proposal(),
+        FeedbackForm: FeedbackForm(title="成果展回饋", intro="謝謝", questions=[
+            FeedbackQuestion(question="整體滿意度", type="線性刻度", options=["差", "好"], required=True)]),
+        EventReport: EventReport(summary="成果展圓滿結束", results=["180 人"], highlights=["體驗"], budget_review="—",
+                                 feedback_summary="好評", improvements=["提早宣傳"], handover=["提早借場地"]),
+    }
+    original = GeminiLLM.structured
+    monkeypatch.setattr(GeminiLLM, "structured", lambda self, system, user, output_type: (
+        fakes[output_type] if output_type in fakes else original(self, system, user, output_type)))
+    at = _app()
+    _signup(at)
+    _switch(at, "events")
+    assert "活動專案" in [t.label for t in at.tabs]
+    _input(at, "活動名稱＊").input("期末成果展")
+    _button(at, "建立活動").click().run()
+    assert any("已建立「期末成果展」" in s.value for s in at.success)
+
+    _button(at, "產生企劃書").click().run()
+    assert not at.exception
+    assert any("展示社員作品" in m.value for m in at.markdown)
+    _button(at, "把企劃書的 3 項籌備工作加入待辦").click().run()
+    assert any("已加入 3 項籌備工作" in s.value for s in at.success)
+
+    _button(at, "產生回饋表單題目").click().run()
+    assert any("整體滿意度［線性刻度，必填］" in c.value for c in at.code)
+    _button(at, "產生成果報告").click().run()
+    assert not at.exception
+    assert any("成果展圓滿結束" in m.value for m in at.markdown)
+
+    from club_agent.store import LocalClubStore
+    from club_agent.tasks import list_tasks
+
+    store = LocalClubStore(os.environ["CLUB_AGENT_DATA_DIR"])  # 籌備工作是全社團待辦，行銷部門看得到
+    tasks = list_tasks(store, at.session_state.club_id, "marketing")
+    assert [t.title for t in tasks] == ["IG 宣傳貼文"] and tasks[0].source == "活動「期末成果展」"

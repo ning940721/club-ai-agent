@@ -136,8 +136,8 @@ def advice_section(ctx: AppContext) -> None:
 # ---------------------------------------------------------------------------
 
 
-def add_task_form(ctx: AppContext, key: str, department: str | None = None) -> None:
-    """新增任務；department 為 None 時可選擇部門。"""
+def add_task_form(ctx: AppContext, key: str, department: str | None = None, project: str = "", source: str = "手動新增") -> None:
+    """新增任務；department 為 None 時可選擇部門。project／source 用於活動籌備清單。"""
     with st.form(f"add_task_{key}", clear_on_submit=True):
         st.markdown("**新增任務**")
         c1, c2 = st.columns([3, 2])
@@ -157,7 +157,8 @@ def add_task_form(ctx: AppContext, key: str, department: str | None = None) -> N
                 save_task(
                     ctx.store,
                     ctx.club_id,
-                    Task(title=title.strip(), department=dept, owner=owner.strip(), due=due.isoformat() if due else "", status=status),
+                    Task(title=title.strip(), department=dept, owner=owner.strip(), due=due.isoformat() if due else "", status=status,
+                         project=project, source=source),
                 )
                 st.success("已新增")
 
@@ -378,6 +379,7 @@ def help_page(csv_columns: list[str]) -> None:
    - 社長：各部門進度總覽；設定會議時間與時長，自動產生進度彙整、議程與會議時間表；追蹤上次會議還沒決議的議題
    - 會議記錄：上傳會議記錄或 LINE 對話，自動整理重點並對照會前議程，還可以直接問問題
    - 行銷：社群數據診斷、活動宣傳企劃
+   - 活動：每個活動一個專案，AI 企劃書、籌備清單（自動成為各部門待辦）、細流與工作人員表、名牌 PDF、回饋表單題目、成果報告
    - 講者：講座邀約進度、候選時間敲定（自動加入行事曆）、AI 撰寫邀請信／確認信／感謝信與社員宣傳通知、講座彙整
    - 財務（社長也看得到）：「財務管理」以財務密碼上鎖，可審核報帳、記帳、編預算、下載月報與學期報表（Excel／Word／PDF）
 6. **社團設定**（左側選單下方）：選擇社團有哪些部門、改部門名稱、填寫部門細節、修改密碼。

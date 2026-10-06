@@ -20,6 +20,7 @@ import streamlit as st  # noqa: E402
 from club_agent.departments import (  # noqa: E402
     DEFAULT_ENABLED,
     DEPARTMENTS,
+    FEATURE_EVENTS,
     FEATURE_FINANCE,
     FEATURE_MARKETING,
     FEATURE_MEETINGS,
@@ -29,6 +30,7 @@ from club_agent.departments import (  # noqa: E402
 )
 from club_agent.store import LocalClubStore, StoreError  # noqa: E402
 from club_agent.web.calendar_pages import calendar_page  # noqa: E402
+from club_agent.web.event_pages import events_page  # noqa: E402
 from club_agent.web.finance_pages import finance_page, reimburse_page  # noqa: E402
 from club_agent.web.common_pages import advisor_page, feed_page, help_page, profile_form, settings_page, tasks_page  # noqa: E402
 from club_agent.web.context import AppContext  # noqa: E402
@@ -193,6 +195,8 @@ if FEATURE_MEETINGS in features:
     pages.append(("會議記錄", meetings_page))
 if FEATURE_MARKETING in features:
     pages += [("社群數據診斷", diagnosis_page), ("活動宣傳企劃", campaign_page)]
+if FEATURE_EVENTS in features:
+    pages.append(("活動專案", events_page))
 if FEATURE_FINANCE in features:
     pages.append(("財務管理", finance_page))
 if FEATURE_SPEAKERS in features:

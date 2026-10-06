@@ -291,3 +291,71 @@ class Letter(BaseModel):
     subject: str = Field(description="信件主旨；社員通知則為貼文標題")
     body: str = Field(description="完整內文，可直接寄出或貼上；未知資訊以【待補：…】標示")
     short_text: str = Field(description="LINE／簡訊用的短版（150 字以內）")
+
+
+# ---------------------------------------------------------------------------
+# 活動專案
+# ---------------------------------------------------------------------------
+
+
+class RundownItem(BaseModel):
+    start: str = Field(description="開始時間 HH:MM")
+    end: str = Field(description="結束時間 HH:MM")
+    item: str = Field(description="流程項目")
+    owner: str = Field(description="負責的角色或組別，例如：主持人、場控組")
+    note: str = Field(description="注意事項；沒有時填空字串")
+
+
+class BudgetLine(BaseModel):
+    item: str = Field(description="支出項目")
+    category: str = Field(description="類別：活動、器材設備、文宣印刷、餐飲、交通、場地、講師費、雜支 其中之一")
+    amount: int = Field(description="預估金額（元）；不確定時依一般行情估算，並在 note 註明「估算」")
+    note: str = Field(description="說明；沒有時填空字串")
+
+
+class PrepTask(BaseModel):
+    task: str = Field(description="籌備工作，要具體可執行")
+    department: str = Field(description="負責部門代號，必須是提供的部門清單中的代號")
+    days_before: int = Field(description="活動前幾天要完成（活動當天為 0）")
+
+
+class RiskItem(BaseModel):
+    risk: str
+    response: str = Field(description="預防與應變方式")
+
+
+class EventProposal(BaseModel):
+    purpose: str = Field(description="活動緣起與目的（2–3 句）")
+    goals: list[str] = Field(description="具體、可衡量的目標")
+    audience: str = Field(description="目標對象與預計人數")
+    content: list[str] = Field(description="活動內容規劃，依進行順序")
+    rundown: list[RundownItem] = Field(description="活動當天流程草稿，時間要連續")
+    budget: list[BudgetLine] = Field(description="預算規劃；總額盡量不超過提供的預算")
+    staffing: list[str] = Field(description="人力配置：各組名稱、人數與職責")
+    promotion: list[str] = Field(description="宣傳規劃與時程")
+    prep_tasks: list[PrepTask] = Field(description="籌備工作清單，涵蓋場地、器材、宣傳、贊助、人力、保險等")
+    risks: list[RiskItem] = Field(description="風險與應變")
+    kpis: list[str] = Field(description="成效指標")
+
+
+class FeedbackQuestion(BaseModel):
+    question: str
+    type: Literal["單選", "複選", "線性刻度", "簡答", "段落"]
+    options: list[str] = Field(description="單選／複選的選項；線性刻度填兩端說明（例：非常不滿意、非常滿意）；簡答與段落為空")
+    required: bool
+
+
+class FeedbackForm(BaseModel):
+    title: str
+    intro: str = Field(description="表單開頭說明（感謝參加、填寫時間約幾分鐘）")
+    questions: list[FeedbackQuestion] = Field(description="8–12 題，先整體滿意度，再各環節，最後開放建議")
+
+
+class EventReport(BaseModel):
+    summary: str = Field(description="活動成果摘要（3–5 句）")
+    results: list[str] = Field(description="目標達成情形，逐項對照目標與實際數字")
+    highlights: list[str] = Field(description="亮點與成功之處")
+    budget_review: str = Field(description="預算執行說明：預算與實際支出的差異與原因")
+    feedback_summary: str = Field(description="參加者回饋重點")
+    improvements: list[str] = Field(description="檢討與下次改進建議，要具體")
+    handover: list[str] = Field(description="給下一屆辦同樣活動的交接重點")

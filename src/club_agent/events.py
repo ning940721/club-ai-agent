@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field
 from .agenda import end_time, list_plans, parse_time
 from .departments import ClubSettings
 from .meetings import list_meetings
+from .projects import list_projects
 from .speakers import ACTIVE_STAGES, list_talks
 from .tasks import list_tasks
 
@@ -26,6 +27,7 @@ COLLECTION = "events"
 KINDS = ("活動", "會議", "截止", "其他")
 SOURCE_MANUAL, SOURCE_PLAN, SOURCE_MEETING, SOURCE_TASK = "自行新增", "會議議程", "會議記錄", "待辦期限"
 SOURCE_TALK = "講座"
+SOURCE_PROJECT = "活動專案"
 
 
 class CalendarEvent(BaseModel):
@@ -96,6 +98,15 @@ def club_events(store, club_id: str, settings: ClubSettings | None = None) -> li
                 CalendarEvent(
                     id=f"meeting-{doc.id}-{len(seen)}", date=k.date, title=k.event, time=k.time, kind="其他",
                     location=k.location, note=f"出自會議記錄「{doc.title}」", source=SOURCE_MEETING,
+                )
+            )
+
+    for p in list_projects(store, club_id):
+        if _valid_date(p.date):
+            events.append(
+                CalendarEvent(
+                    id=f"project-{p.id}", date=p.date, title=p.name, time=p.start_time, end=p.end_time, kind="活動",
+                    department="events", location=p.location, note=f"階段：{p.stage}", source=SOURCE_PROJECT,
                 )
             )
 

@@ -17,6 +17,7 @@ from .retriever import DEFAULT_KB_DIR, BM25Retriever, Chunk, split_markdown
 FEATURE_PRESIDENT = "president_overview"
 FEATURE_MEETINGS = "meetings"
 FEATURE_MARKETING = "marketing_tools"
+FEATURE_EVENTS = "event_projects"  # 活動專案：企劃書、籌備清單、細流、回饋表單、成果報告
 FEATURE_SPEAKERS = "speaker_tools"  # 講座邀約、時間敲定、信件與宣傳通知
 FEATURE_FINANCE = "finance_tools"  # 財務管理（以財務密碼上鎖，財務與社長使用）
 
@@ -83,6 +84,7 @@ DEPARTMENTS: dict[str, Department] = {
             focus=("活動企劃書", "流程與分工", "風險與應變", "參與者體驗與回饋"),
             example_questions=("第一次辦迎新宿營，企劃書要包含哪些內容？", "活動當天人手不夠，事前要怎麼排班？"),
             details_hint="例：每學期固定辦迎新、期中聯誼、期末成果展；活動企劃需在一個月前送幹部會",
+            features=(FEATURE_EVENTS,),
         ),
         Department(
             key="minutes",
