@@ -245,11 +245,11 @@ def test_signup_code_required(monkeypatch):
     assert any("邀請碼錯誤" in e.value for e in at.error)
 
 
-def test_advisor_and_feed_are_last_tabs():
+def test_advisor_feed_and_calendar_are_last_tabs():
     at = _app()
     _signup(at)
     _switch(at, "marketing")
-    assert [t.label for t in at.tabs][-2:] == ["部門顧問", "社團動態"]
+    assert [t.label for t in at.tabs][-3:] == ["部門顧問", "社團動態", "行事曆"]
 
 
 def test_advice_not_shared_until_officer_chooses():

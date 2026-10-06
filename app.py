@@ -175,7 +175,7 @@ if FEATURE_MARKETING in features:
     pages += [("社群數據診斷", diagnosis_page), ("活動宣傳企劃", campaign_page)]
 if FEATURE_PRESIDENT not in features:
     pages.append(("待辦與進度", tasks_page))
-pages += [("行事曆", calendar_page), ("部門顧問", advisor_page), ("社團動態", feed_page)]
+pages += [("部門顧問", advisor_page), ("社團動態", feed_page), ("行事曆", calendar_page)]
 
 for tab, (_, render) in zip(st.tabs([name for name, _ in pages]), pages):
     with tab:
