@@ -207,6 +207,15 @@ class KeyDate(BaseModel):
     location: str = Field(description="地點；不知道時填空字串")
 
 
+AGENDA_RESULTS = ("已決議", "已討論、未決議", "未討論")
+
+
+class AgendaCheck(BaseModel):
+    topic: str = Field(description="議程上的議題，照原議程填寫")
+    result: Literal["已決議", "已討論、未決議", "未討論"]
+    note: str = Field(description="決議內容或目前討論到哪裡；未討論時填空字串")
+
+
 class MeetingSummary(BaseModel):
     title: str = Field(description="會議或對話的簡短標題")
     summary: str = Field(description="3–5 句重點摘要")
@@ -214,6 +223,12 @@ class MeetingSummary(BaseModel):
     action_items: list[ActionItem] = Field(description="待辦事項")
     key_dates: list[KeyDate] = Field(description="提到的重要日期，包含下次開會時間")
     open_questions: list[str] = Field(description="尚未決定、需要後續討論的事項")
+    agenda_review: list[AgendaCheck] = Field(
+        default_factory=list, description="對照 <agenda> 的每個議題逐一判斷結果；沒有提供議程時為空陣列"
+    )
+
+    def unresolved_agenda(self) -> list[AgendaCheck]:
+        return [c for c in self.agenda_review if c.result != "已決議"]
 
 
 class SourceRef(BaseModel):

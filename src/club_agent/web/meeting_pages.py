@@ -6,6 +6,7 @@ from datetime import date
 
 import streamlit as st
 
+from ..agenda import find_plan_for, get_plan, list_plans
 from ..agents import MeetingQA, MeetingSummarizer
 from ..meetings import (
     SOURCE_TYPES,
@@ -54,6 +55,30 @@ def ask_section(ctx: AppContext, docs: list[MeetingDoc]) -> None:
         st.markdown(md)
 
 
+def plan_picker(ctx: AppContext, meeting_date: date) -> str:
+    """選擇要對照的會議議程（社長在總覽排好的時間表）；預設選日期最接近的那份。"""
+    plans = list_plans(ctx.store, ctx.club_id)
+    if not plans:
+        return ""
+    matched = find_plan_for(plans, meeting_date.isoformat())
+    options = ["", *[p.id for p in plans]]
+    labels = {"": "不對照議程", **{p.id: p.label() for p in plans}}
+    return st.selectbox(
+        "對照會前議程",
+        options,
+        index=options.index(matched.id) if matched else 0,
+        format_func=labels.get,
+        key=f"m_plan_{meeting_date.isoformat()}",  # 換日期時重新選擇最接近的議程
+        help="AI 會逐一檢查議程上每個議題是否已有決議，社長總覽會列出還沒完成的議題",
+    )
+
+
+def summarize(ctx: AppContext, llm, doc: MeetingDoc):
+    plan = get_plan(ctx.store, ctx.club_id, doc.plan_id)
+    agenda = plan.agenda_text() if plan else ""
+    return MeetingSummarizer(llm).run(ctx.settings, doc.title, doc.date, doc.source_type, doc.text, agenda)
+
+
 def add_section(ctx: AppContext) -> None:
     c1, c2, c3 = st.columns([2, 2, 3])
     source_type = c1.selectbox("類型", SOURCE_TYPES, key="m_type")
@@ -61,6 +86,7 @@ def add_section(ctx: AppContext) -> None:
     title = c3.text_input("標題", placeholder="例：第 5 次幹部會、成果展籌備群組", key="m_title")
     uploaded = st.file_uploader("上傳檔案（.txt／.md／.docx；LINE 請用「傳送聊天記錄」匯出的 .txt）", type=["txt", "md", "docx"], key="m_file")
     pasted = st.text_area("或直接貼上內容", height=200, key="m_text")
+    plan_id = plan_picker(ctx, meeting_date)
 
     col_a, col_b = st.columns(2)
     summarize_clicked = col_a.button("整理重點並儲存", type="primary", key="m_summarize")
@@ -83,13 +109,10 @@ def add_section(ctx: AppContext) -> None:
         date=meeting_date.isoformat(),
         source_type=source_type,
         text=text,
+        plan_id=plan_id,
     )
     if summarize_clicked:
-        summary = ctx.run_ai(
-            "整理重點中…",
-            lambda llm, _s: MeetingSummarizer(llm).run(ctx.settings, doc.title, doc.date, doc.source_type, doc.text),
-            "整理完成",
-        )
+        summary = ctx.run_ai("整理重點中…", lambda llm, _s: summarize(ctx, llm, doc), "整理完成")
         if summary is None:
             return
         doc.summary = summary
@@ -124,10 +147,7 @@ def records_section(ctx: AppContext, docs: list[MeetingDoc]) -> None:
             st.markdown(demote_headings(_summary_md(ctx, doc)))
             action_items_to_tasks(ctx, doc)
             if not doc.summary and st.button("整理重點", key=f"sum_{doc.id}"):
-                summary = ctx.run_ai(
-                    "整理重點中…",
-                    lambda llm, _s, d=doc: MeetingSummarizer(llm).run(ctx.settings, d.title, d.date, d.source_type, d.text),
-                )
+                summary = ctx.run_ai("整理重點中…", lambda llm, _s, d=doc: summarize(ctx, llm, d))
                 if summary:
                     doc.summary = summary
                     save_meeting(ctx.store, ctx.club_id, doc)

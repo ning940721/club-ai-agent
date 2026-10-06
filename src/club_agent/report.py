@@ -113,6 +113,10 @@ def meeting_summary_markdown(title: str, meeting_date: str, s: MeetingSummary, d
         out += [f"- **{k.date}** {' '.join(x for x in (k.time, k.location) if x)}｜{k.event}" for k in s.key_dates]
     if s.open_questions:
         out += ["", "## 待討論", *[f"- {q}" for q in s.open_questions]]
+    if s.agenda_review:
+        done = sum(c.result == "已決議" for c in s.agenda_review)
+        out += ["", f"## 議程對照（{done}／{len(s.agenda_review)} 項已決議）", "| 議題 | 結果 | 說明 |", "|---|---|---|"]
+        out += [f"| {_cell(c.topic)} | {c.result} | {_cell(c.note or '—')} |" for c in s.agenda_review]
     return "\n".join(out) + "\n"
 
 

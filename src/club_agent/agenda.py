@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 
+from pydantic import BaseModel, Field
+
 from .schemas import AgendaItem
 
 KINDS = ("報告", "討論", "決議")
@@ -107,3 +109,61 @@ def schedule_markdown(
         diff = planned_minutes - used
         out += ["", f"> 議程共 {used} 分鐘，" + (f"比預定時長少 {diff} 分鐘。" if diff > 0 else f"超過預定時長 {-diff} 分鐘。")]
     return "\n".join(out) + "\n"
+
+
+# ---------------------------------------------------------------------------
+# 儲存：社長排好的會議議程會存起來，會議記錄整理重點時拿來對照
+# ---------------------------------------------------------------------------
+
+COLLECTION = "meeting_plans"
+
+
+class MeetingPlan(BaseModel):
+    date: str = Field(description="會議日期 YYYY-MM-DD，同一天只有一份議程")
+    start: str = "19:00"
+    minutes: int = 90
+    location: str = ""
+    agenda: list[AgendaRow] = Field(default_factory=list)
+
+    @property
+    def id(self) -> str:
+        return self.date
+
+    def label(self) -> str:
+        return f"{self.date} {self.start}｜{len(self.agenda)} 個議題"
+
+    def agenda_text(self) -> str:
+        """給 AI 對照用的議程清單。"""
+        return "\n".join(f"{i}. {r.topic}（{r.kind}，{r.department or '未指定'}）" for i, r in enumerate(self.agenda, 1))
+
+
+def save_plan(store, club_id: str, plan: MeetingPlan) -> None:
+    store.put_doc(club_id, COLLECTION, plan.id, plan.model_dump())
+
+
+def list_plans(store, club_id: str) -> list[MeetingPlan]:
+    """由新到舊。"""
+    return sorted((MeetingPlan(**d) for d in store.list_docs(club_id, COLLECTION)), key=lambda p: p.date, reverse=True)
+
+
+def get_plan(store, club_id: str, plan_id: str) -> MeetingPlan | None:
+    data = store.get_doc(club_id, COLLECTION, plan_id) if plan_id else None
+    return MeetingPlan(**data) if data else None
+
+
+def find_plan_for(plans: list[MeetingPlan], meeting_date: str, within_days: int = 3) -> MeetingPlan | None:
+    """找出和會議記錄日期最接近的議程（前後幾天內），會議改期也對得上。"""
+    try:
+        target = date.fromisoformat(meeting_date)
+    except ValueError:
+        return None
+    best = None
+    for p in plans:
+        gap = abs((date.fromisoformat(p.date) - target).days)
+        if gap <= within_days and (best is None or gap < best[0]):
+            best = (gap, p)
+    return best[1] if best else None
+
+
+def delete_plan(store, club_id: str, plan_id: str) -> None:
+    store.delete_doc(club_id, COLLECTION, plan_id)

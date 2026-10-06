@@ -18,7 +18,7 @@ from pydantic import BaseModel, Field
 
 from .metrics import decode_csv_bytes
 from .retriever import BM25Retriever, Chunk
-from .schemas import MeetingSummary
+from .schemas import AGENDA_RESULTS, AgendaCheck, MeetingSummary
 
 COLLECTION = "meetings"
 SUMMARY_PART_CHARS = 60_000  # 每段送給 AI 摘要的最大字數
@@ -35,6 +35,7 @@ class MeetingDoc(BaseModel):
     date: str = Field(description="會議或對話日期 YYYY-MM-DD")
     source_type: str = "會議記錄"
     text: str
+    plan_id: str = Field(default="", description="對照的會議議程（MeetingPlan 的日期）；沒有對照時為空")
     summary: MeetingSummary | None = None
     created_at: str = Field(default_factory=lambda: datetime.now().isoformat(timespec="seconds"))
 
@@ -125,7 +126,19 @@ def merge_summaries(summaries: list[MeetingSummary]) -> MeetingSummary:
         action_items=dedupe([a for s in summaries for a in s.action_items]),
         key_dates=dedupe([k for s in summaries for k in s.key_dates]),
         open_questions=dedupe([q for s in summaries for q in s.open_questions]),
+        agenda_review=merge_agenda_reviews([s.agenda_review for s in summaries]),
     )
+
+
+def merge_agenda_reviews(reviews: list[list[AgendaCheck]]) -> list[AgendaCheck]:
+    """分段摘要時，同一個議題取進度最多的那段（已決議 > 已討論 > 未討論），並保留議程順序。"""
+    best: dict[str, AgendaCheck] = {}
+    for review in reviews:
+        for c in review:
+            current = best.get(c.topic)
+            if current is None or AGENDA_RESULTS.index(c.result) < AGENDA_RESULTS.index(current.result):
+                best[c.topic] = c
+    return list(best.values())
 
 
 # ---------------------------------------------------------------------------
@@ -172,6 +185,7 @@ def recent_summaries_digest(docs: list[MeetingDoc], limit: int = 3) -> str:
         lines += [f"  決議：{x}" for x in s.decisions]
         lines += [f"  待辦：{a.task}（{a.owner or '未指定'}，{a.due or '無期限'}）" for a in s.action_items]
         lines += [f"  待討論：{q}" for q in s.open_questions]
+        lines += [f"  議程未完成：{c.topic}（{c.result}）" for c in s.unresolved_agenda()]
     return "\n".join(lines) or "（沒有已整理的會議記錄）"
 
 

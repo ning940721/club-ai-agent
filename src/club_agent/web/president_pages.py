@@ -10,9 +10,14 @@ import streamlit as st
 from ..agenda import (
     KINDS,
     AgendaRow,
+    MeetingPlan,
+    delete_plan,
+    get_plan,
+    list_plans,
     meeting_description,
     parse_time,
     rows_from_items,
+    save_plan,
     schedule,
     schedule_markdown,
     template_rows,
@@ -20,6 +25,8 @@ from ..agenda import (
 )
 from ..agents import ProgressReporter
 from ..departments import MeetingDefaults
+from ..events import club_events
+from ..events import upcoming as upcoming_events
 from ..meetings import list_meetings, recent_summaries_digest
 from ..report import progress_brief_markdown
 from ..store import activity_digest
@@ -29,21 +36,22 @@ from .context import AppContext, demote_headings, download_buttons
 
 
 def upcoming_dates(ctx: AppContext, today: date) -> list[str]:
-    rows = []
-    for doc in list_meetings(ctx.store, ctx.club_id):
-        if doc.summary:
-            for k in doc.summary.key_dates:
-                if k.date >= today.isoformat():
-                    extra = " ".join(x for x in (k.time, k.location) if x)
-                    rows.append((k.date, f"**{k.date}** {extra}｜{k.event}"))
-    return [line for _, line in sorted(set(rows))]
+    """接下來的行程（來自行事曆：會議、會議記錄中的日期、自行新增的行程；待辦期限另外列在逾期／任務表）。"""
+    lines = []
+    for e in upcoming_events(club_events(ctx.store, ctx.club_id, ctx.settings), today):
+        if e.kind == "截止":
+            continue
+        extra = " ".join(x for x in (e.time, e.location) if x)
+        dept = f"［{ctx.settings.name(e.department)}］" if e.department else ""
+        lines.append(f"**{e.date}** {extra}｜{dept}{e.title}")
+    return lines
 
 
-def meeting_inputs(ctx: AppContext, today: date) -> tuple[date, object, int, str]:
+def meeting_inputs(ctx: AppContext, today: date, default_date: date) -> tuple[date, object, int, str]:
     """會議日期、開始時間、時長與地點；時間、時長、地點會存成社團預設值，下次自動帶入。"""
     saved = ctx.settings.meeting
     c1, c2, c3, c4 = st.columns([2, 2, 2, 3])
-    meeting_date = c1.date_input("會議日期", value=today + timedelta(days=7), key="mt_date")
+    meeting_date = c1.date_input("會議日期", value=default_date, key="mt_date")
     start = c2.time_input("開始時間", value=parse_time(saved.start), step=300, key="mt_start")
     minutes = c3.number_input("會議時長（分鐘）", min_value=10, max_value=480, value=saved.minutes, step=10, key="mt_minutes")
     location = c4.text_input("地點（選填）", value=saved.location, placeholder="例：社辦、線上 Google Meet", key="mt_location")
@@ -56,6 +64,7 @@ def meeting_inputs(ctx: AppContext, today: date) -> tuple[date, object, int, str
 
 def set_agenda(rows: list[AgendaRow]) -> None:
     st.session_state.agenda_rows = rows
+    st.session_state.agenda_current = rows
     st.session_state.agenda_version = st.session_state.get("agenda_version", 0) + 1  # 讓編輯表格重新載入
 
 
@@ -94,10 +103,44 @@ def agenda_editor(rows: list[AgendaRow]) -> list[AgendaRow]:
     return out
 
 
+def remember_plan(ctx: AppContext, plan: MeetingPlan) -> None:
+    """自動儲存議程；這次操作中改了會議日期時，移除舊日期的那份，避免留下重複的議程。"""
+    previous = st.session_state.get("plan_saved_date")
+    if previous and previous != plan.date:
+        delete_plan(ctx.store, ctx.club_id, previous)
+    if get_plan(ctx.store, ctx.club_id, plan.id) != plan:
+        save_plan(ctx.store, ctx.club_id, plan)
+    st.session_state.plan_saved_date = plan.date
+
+
+def unresolved_section(ctx: AppContext) -> None:
+    """上次會議中還沒有決議的議題（來自會議記錄的議程對照），可以一鍵加入這次議程。"""
+    last = next((d for d in list_meetings(ctx.store, ctx.club_id) if d.summary and d.summary.agenda_review), None)
+    if last is None:
+        return
+    pending = last.summary.unresolved_agenda()
+    st.markdown(f"**上次會議議程追蹤**（{last.date}｜{last.title}）")
+    if not pending:
+        st.caption("上次議程的所有議題都已經有決議。")
+        return
+    for c in pending:
+        st.markdown(f"- {c.topic}：{c.result}" + (f"（{c.note}）" if c.note else ""))
+    rows = st.session_state.get("agenda_current") or st.session_state.get("agenda_rows") or []  # 含表格中的修改
+    existing = {r.topic for r in rows}
+    new = [AgendaRow(c.topic, 10, "討論", "", f"延續上次：{c.note}" if c.note else "延續上次會議") for c in pending if c.topic not in existing]
+    if new and st.button("把這些議題加入下次議程", key="carry_over"):
+        set_agenda([*rows, *new])
+        st.rerun()
+
+
 def meeting_section(ctx: AppContext, tasks, records, today: date) -> None:
     st.subheader("下次幹部會議")
     st.caption("設定會議時間與時長，AI 會依各部門的待辦、社團動態與最近的會議記錄規劃議程，並排出每個議題的時段。")
-    meeting_date, start, minutes, location = meeting_inputs(ctx, today)
+    upcoming = [p for p in list_plans(ctx.store, ctx.club_id) if p.date >= today.isoformat()]
+    default_date = date.fromisoformat(upcoming[-1].date) if upcoming else today + timedelta(days=7)
+    meeting_date, start, minutes, location = meeting_inputs(ctx, today, default_date)
+    if st.session_state.get("agenda_rows") is None and (saved := get_plan(ctx.store, ctx.club_id, meeting_date.isoformat())):
+        set_agenda(saved.agenda)  # 之前排好的議程
 
     col_ai, col_template, col_share = st.columns([2, 2, 3], vertical_alignment="center")
     clicked = col_ai.button("產生進度彙整與議程", type="primary", width="stretch")
@@ -133,6 +176,7 @@ def meeting_section(ctx: AppContext, tasks, records, today: date) -> None:
         st.session_state.pop("progress_brief", None)
         st.session_state.pop("result_brief", None)
 
+    unresolved_section(ctx)
     rows = st.session_state.get("agenda_rows")
     if rows is None:
         return
@@ -140,6 +184,7 @@ def meeting_section(ctx: AppContext, tasks, records, today: date) -> None:
     st.markdown("**會議時間表**")
     with st.expander("調整議程（修改議題、分鐘數，或在表格最下方新增一列；勾選列後可刪除）"):
         rows = agenda_editor(rows)
+    st.session_state.agenda_current = rows
     used = total_minutes(rows)
     table = pd.DataFrame(
         {
@@ -158,6 +203,9 @@ def meeting_section(ctx: AppContext, tasks, records, today: date) -> None:
         st.caption(f"共 {used} 分鐘，比預定時長少 {minutes - used} 分鐘。")
     else:
         st.warning(f"議程共 {used} 分鐘，超過預定時長 {used - minutes} 分鐘，建議縮短部分議題。")
+
+    remember_plan(ctx, MeetingPlan(date=meeting_date.isoformat(), start=f"{start:%H:%M}", minutes=minutes, location=location, agenda=rows))
+    st.caption("議程會自動儲存；會議記錄部門整理這場會議的記錄時，會逐一對照每個議題是否已有決議。")
 
     agenda_md = schedule_markdown(meeting_date, start, minutes, rows, location)
     if brief := st.session_state.get("progress_brief"):
@@ -216,11 +264,11 @@ def president_page(ctx: AppContext) -> None:
         if not overdue:
             st.caption("目前沒有逾期任務。")
     with c2:
-        st.markdown("**近期重要日期**（來自會議記錄）")
+        st.markdown("**近期行程**（完整內容見「行事曆」）")
         for line in upcoming[:10]:
             st.markdown(f"- {line}")
         if not upcoming:
-            st.caption("尚無日期。上傳會議記錄並整理重點後會自動出現。")
+            st.caption("目前沒有之後的行程。排好的幹部會議、會議記錄中的日期與自行新增的行程都會出現在這裡。")
 
     st.divider()
     meeting_section(ctx, tasks, records, today)

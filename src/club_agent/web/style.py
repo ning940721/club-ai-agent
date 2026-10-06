@@ -25,6 +25,27 @@ section[data-testid="stSidebar"] .block-container { padding-top: 1.5rem; }
 .section-note { font-size: 0.88rem; color: #6B7280; margin: -0.4rem 0 0.9rem 0; }
 
 button[data-baseweb="tab"] p { font-size: 0.95rem; }
+
+/* 行事曆 */
+.cal-wrap { overflow-x: auto; margin: 0.4rem 0 1rem 0; }
+table.cal { width: 100%; min-width: 560px; border-collapse: collapse; table-layout: fixed; }
+table.cal th { font-size: 0.8rem; font-weight: 500; color: #6B7280; padding: 0.3rem; text-align: left; border-bottom: 1px solid #E2DED6; }
+table.cal td.cal-day { vertical-align: top; height: 92px; padding: 0.25rem; border: 1px solid #E2DED6; background: #FFFFFF; overflow: hidden; }
+table.cal td.cal-out { background: #F6F4EF; }
+table.cal td.cal-out .cal-num { color: #B4B0A6; }
+table.cal td.cal-today { box-shadow: inset 0 0 0 2px #2D4A6B; }
+.cal-num { font-size: 0.78rem; color: #1D2433; margin-bottom: 0.15rem; }
+.cal-chip {
+  display: block; font-size: 0.72rem; line-height: 1.35; padding: 0.05rem 0.3rem; margin-bottom: 0.15rem;
+  border-radius: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cal-legend { margin-top: 0.4rem; }
+.cal-legend .cal-chip { display: inline-block; margin-right: 0.4rem; }
+.ev-event { background: #E3EBF4; color: #22405F; }
+.ev-meeting { background: #2D4A6B; color: #FFFFFF; }
+.ev-due { background: #F7E3DF; color: #8A3324; }
+.ev-other { background: #ECEAE4; color: #4B5160; }
+.cal-more { font-size: 0.7rem; color: #6B7280; }
 div[data-testid="stExpander"] details { border-color: #E2DED6; }
 </style>
 """

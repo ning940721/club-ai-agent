@@ -20,6 +20,8 @@ SUMMARY_PROMPT = """你是學生社團的會議記錄秘書，負責把會議記
 - 待辦事項要具體，負責人與期限照原文填寫，沒寫就留空。
 - 日期一律寫成 YYYY-MM-DD；原文只寫月日（例如 12/4）時，依記錄日期推算年份。
 - 待辦的 department 必須使用下方部門清單中的代號。
+- 有提供 <agenda>（會前排好的議程）時，在 agenda_review 逐一列出每個議題：有明確結論填「已決議」，
+  有討論但沒結論填「已討論、未決議」，記錄中完全沒提到填「未討論」；只看到部分記錄時，沒提到的議題一律填「未討論」。
 - 全部使用繁體中文。"""
 
 QA_PROMPT = """你是學生社團的會議記錄小幫手，根據社團的會議記錄與 LINE 對話記錄回答幹部的問題。
@@ -41,21 +43,29 @@ class MeetingSummarizer:
         self.llm = llm
         self.max_workers = max_workers  # 很長的記錄會分段，各段同時送出以縮短等待時間
 
-    def build_prompt(self, settings: ClubSettings, title: str, meeting_date: str, source_type: str, text: str, part: str = "") -> str:
+    def build_prompt(
+        self, settings: ClubSettings, title: str, meeting_date: str, source_type: str, text: str, part: str = "", agenda: str = ""
+    ) -> str:
+        agenda_block = f"\n<agenda>\n{agenda}\n</agenda>\n" if agenda else ""
         return f"""<departments>
 {department_codes(settings)}
 </departments>
-
+{agenda_block}
 <record title="{title}" date="{meeting_date}" type="{source_type}"{f' part="{part}"' if part else ''}>
 {text}
 </record>
 
 請整理這份{source_type}的重點。"""
 
-    def run(self, settings: ClubSettings, title: str, meeting_date: str, source_type: str, text: str) -> MeetingSummary:
+    def run(
+        self, settings: ClubSettings, title: str, meeting_date: str, source_type: str, text: str, agenda: str = ""
+    ) -> MeetingSummary:
+        """agenda：會前排好的議程（MeetingPlan.agenda_text()）；有提供時會逐一對照每個議題的結果。"""
         parts = split_parts(text)
         prompts = [
-            self.build_prompt(settings, title, meeting_date, source_type, part, f"{i}/{len(parts)}" if len(parts) > 1 else "")
+            self.build_prompt(
+                settings, title, meeting_date, source_type, part, f"{i}/{len(parts)}" if len(parts) > 1 else "", agenda
+            )
             for i, part in enumerate(parts, 1)
         ]
         if len(prompts) == 1:

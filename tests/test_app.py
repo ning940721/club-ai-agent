@@ -292,3 +292,52 @@ def test_edited_template_agenda_can_be_shared():
     assert any("已分享到社團動態" in c.value for c in at.caption)
     _switch(at, "pr")
     assert any("幹部會議議程" in m.value for m in at.markdown)
+
+
+def test_calendar_add_event_and_show_planned_meeting():
+    at = _app()
+    _signup(at)
+    _button(at, "使用基本議程（不使用 AI）").click().run()  # 排好的會議會出現在行事曆
+    _switch(at, "pr")
+    _input(at, "行程名稱＊").input("贊助商拜訪")
+    _button(at, "加入行事曆").click().run()
+    assert not at.exception
+    assert any("已新增「贊助商拜訪」" in s.value for s in at.success)
+    page = " ".join(m.value for m in at.markdown)
+    assert "贊助商拜訪" in page and "幹部會議" in page
+
+
+def test_meeting_record_is_checked_against_agenda_and_follow_up_shown(monkeypatch):
+    from club_agent.schemas import AgendaCheck
+
+    at = _app()
+    _signup(at)
+    _button(at, "使用基本議程（不使用 AI）").click().run()
+    assert any("議程會自動儲存" in c.value for c in at.caption)
+
+    review = [AgendaCheck(topic="討論與決議事項", result="已討論、未決議", note="場地還在比價")]
+    original = GeminiLLM.structured
+    seen_prompts = []
+
+    def fake(self, system, user, output_type):
+        if output_type is MeetingSummary:
+            seen_prompts.append(user)
+            return make_summary(agenda_review=review)
+        return original(self, system, user, output_type)
+
+    monkeypatch.setattr(GeminiLLM, "structured", fake)
+    _switch(at, "minutes")
+    from datetime import date, timedelta
+
+    plan_id = (date.today() + timedelta(days=7)).isoformat()  # 社長頁面預設的會議日期
+    at.session_state[f"m_plan_{date.today().isoformat()}"] = plan_id  # AppTest 無法操作自訂顯示文字的下拉選單
+    at.run()
+    _input(at, "或直接貼上內容").input("討論場地，還沒決定")
+    _button(at, "整理重點並儲存").click().run()
+    assert not at.exception
+    assert "<agenda>" in seen_prompts[0] and "討論與決議事項" in seen_prompts[0]
+    assert any("議程對照" in m.value for m in at.markdown)
+
+    _switch(at, "president")
+    assert any("上次會議議程追蹤" in m.value for m in at.markdown)
+    assert any("討論與決議事項：已討論、未決議" in m.value for m in at.markdown)

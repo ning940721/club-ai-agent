@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "club-agent"
-version = "0.7.0"
+version = "0.8.0"
 description = "基於 AI Agent 之校園學生社團全方位營運顧問與專案優化系統（行銷宣傳與數據診斷模組）"
 readme = "README.md"
 requires-python = ">=3.10"

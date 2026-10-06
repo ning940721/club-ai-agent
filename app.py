@@ -26,6 +26,7 @@ from club_agent.departments import (  # noqa: E402
     ClubSettings,
 )
 from club_agent.store import LocalClubStore, StoreError  # noqa: E402
+from club_agent.web.calendar_pages import calendar_page  # noqa: E402
 from club_agent.web.common_pages import advisor_page, feed_page, help_page, profile_form, settings_page, tasks_page  # noqa: E402
 from club_agent.web.context import AppContext  # noqa: E402
 from club_agent.web.style import inject_css, page_header, sidebar_brand  # noqa: E402
@@ -174,7 +175,7 @@ if FEATURE_MARKETING in features:
     pages += [("社群數據診斷", diagnosis_page), ("活動宣傳企劃", campaign_page)]
 if FEATURE_PRESIDENT not in features:
     pages.append(("待辦與進度", tasks_page))
-pages += [("部門顧問", advisor_page), ("社團動態", feed_page)]
+pages += [("行事曆", calendar_page), ("部門顧問", advisor_page), ("社團動態", feed_page)]
 
 for tab, (_, render) in zip(st.tabs([name for name, _ in pages]), pages):
     with tab:
