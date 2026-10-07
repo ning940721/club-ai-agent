@@ -135,7 +135,7 @@ def unresolved_section(ctx: AppContext) -> None:
 
 def meeting_section(ctx: AppContext, tasks, records, today: date) -> None:
     st.subheader("下次幹部會議")
-    st.caption("設定會議時間與時長，AI 會依各部門的待辦、社團動態與最近的會議記錄規劃議程，並排出每個議題的時段。")
+    st.caption("設定會議時間與時長，AI 會依各部門的待辦、成果分享與最近的會議記錄規劃議程，並排出每個議題的時段。")
     upcoming = [p for p in list_plans(ctx.store, ctx.club_id) if p.date >= today.isoformat()]
     default_date = date.fromisoformat(upcoming[-1].date) if upcoming else today + timedelta(days=7)
     meeting_date, start, minutes, location = meeting_inputs(ctx, today, default_date)
@@ -218,7 +218,7 @@ def meeting_section(ctx: AppContext, tasks, records, today: date) -> None:
         md = f"# {ctx.club.name} 幹部會議議程\n\n{agenda_md}"
         download_buttons(md, f"幹部會議議程_{meeting_date.isoformat()}", "meeting_agenda")
 
-    # 還沒分享時，按「分享到社團動態」要分享修改後的最新議程，而不是 AI 剛產生的版本
+    # 還沒分享時，按「放到成果分享」要分享修改後的最新議程，而不是 AI 剛產生的版本
     item = st.session_state.get("result_brief")
     if item is None:
         title = f"幹部會議議程（{meeting_date.isoformat()}）"

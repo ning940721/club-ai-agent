@@ -114,7 +114,7 @@ def request_form(ctx: AppContext) -> None:
         department = c2.selectbox("部門", departments, index=departments.index(ctx.dept_key), format_func=ctx.settings.name)
         item = st.text_input("項目＊", placeholder="例：成果展海報輸出 A1 × 5 張")
         c3, c4, c5 = st.columns(3)
-        category = c3.selectbox("類別", EXPENSE_CATEGORIES)
+        category = c3.selectbox("類別", get_settings(ctx.store, ctx.club_id).categories or EXPENSE_CATEGORIES)
         amount = c4.number_input("金額（元）＊", min_value=0, step=1, value=0)
         receipt_date = c5.date_input("消費日期", value=date.today())
         c6, c7, c8 = st.columns(3)
@@ -201,7 +201,7 @@ def finance_tabs(ctx: AppContext) -> list[tuple[str, Callable[[], None]]]:
     requests = list_requests(ctx.store, ctx.club_id)
     pending = sum(r.status == PENDING for r in requests)
     c1, c2 = st.columns([5, 1])
-    c1.caption("財務資料只有財務與社長看得到，內容不會出現在社團動態。")
+    c1.caption("財務資料只有財務與社長看得到，內容不會出現在成果分享。")
     if c2.button("鎖定", icon=":material/lock:", type="tertiary"):
         st.session_state.pop("finance_unlocked", None)
         st.rerun()
@@ -321,7 +321,7 @@ def ledger_section(ctx: AppContext, requests: list[Reimbursement]) -> None:
         with st.form("ledger_add", clear_on_submit=True, border=False):
             c1, c2, c3 = st.columns(3)
             day = c1.date_input("日期", value=today)
-            category = c2.selectbox("類別", INCOME_CATEGORIES if kind == INCOME else EXPENSE_CATEGORIES)
+            category = c2.selectbox("類別", INCOME_CATEGORIES if kind == INCOME else (fs.categories or EXPENSE_CATEGORIES))
             amount = c3.number_input("金額（元）", min_value=0, step=1, value=0)
             description = st.text_input("說明＊", placeholder="例：10 月社費 25 人 × 300 元" if kind == INCOME else "例：社辦文具")
             c4, c5 = st.columns(2)
@@ -381,18 +381,49 @@ def budget_section(ctx: AppContext, requests: list[Reimbursement]) -> None:
             },
         )
     st.markdown("**編列預算**")
-    categories = [*EXPENSE_CATEGORIES, *[c for c in fs.budgets if c not in EXPENSE_CATEGORIES]]
+    st.caption("可以直接修改類別名稱與金額；在表格最下方新增一列可以增加類別，勾選列後按刪除圖示可以移除類別。"
+               "這些類別會用在報帳申請、記帳與活動預算。")
     edited = st.data_editor(
-        pd.DataFrame({"類別": categories, "預算": [fs.budgets.get(c, 0) for c in categories]}),
-        hide_index=True, disabled=["類別"], key="budget_editor",
-        column_config={"預算": st.column_config.NumberColumn(min_value=0, step=100, format="%,d")},
+        pd.DataFrame({
+            "類別": pd.Series(list(fs.categories), dtype="object"),
+            "預算": pd.Series([fs.budgets.get(c, 0) for c in fs.categories], dtype="int64"),
+        }),
+        hide_index=True, num_rows="dynamic", key="budget_editor",
+        column_config={
+            "類別": st.column_config.TextColumn(required=True, max_chars=20),
+            "預算": st.column_config.NumberColumn(min_value=0, step=100, format="%,d", default=0),
+        },
     )
-    total = int(edited["預算"].fillna(0).sum())
-    st.caption(f"預算合計 {total:,} 元。建議保留 5%–10% 作為預備金（放在「雜支」）。")
+    categories, budgets = budget_from_editor(edited.to_dict("records"))
+    total = sum(budgets.values())
+    st.caption(f"{len(categories)} 個類別，預算合計 {total:,} 元。建議保留 5%–10% 作為預備金。")
+    removed = [c for c in fs.categories if c not in categories]
+    in_use = [c for c in removed if any(b.category == c and (b.used or b.pending) for b in rows)]
+    if in_use:
+        st.info(f"「{'、'.join(in_use)}」已經有支出紀錄：移除後這些金額仍會列在預算執行表（標示為未編預算），不會消失。")
     if st.button("儲存預算", type="primary"):
-        budgets = {row["類別"]: int(row["預算"] or 0) for row in edited.to_dict("records") if row["預算"] and row["預算"] > 0}
-        save_settings(ctx.store, ctx.club_id, fs.model_copy(update={"budgets": budgets}))
-        _done("budget", "已儲存預算")
+        if not categories:
+            st.error("至少要保留一個類別")
+        else:
+            save_settings(ctx.store, ctx.club_id, fs.model_copy(update={"categories": categories, "budgets": budgets}))
+            _done("budget", f"已儲存 {len(categories)} 個類別的預算")
+
+
+def budget_from_editor(records: list[dict]) -> tuple[list[str], dict[str, int]]:
+    """預算表格 → (類別清單, 類別 → 預算)。空白名稱略過，重複的類別合併金額。"""
+    categories: list[str] = []
+    budgets: dict[str, int] = {}
+    for row in records:
+        name = str(row.get("類別") or "").strip()
+        if not name or name == "nan":
+            continue
+        amount = row.get("預算")
+        amount = 0 if amount is None or pd.isna(amount) else int(amount)
+        if name not in categories:
+            categories.append(name)
+        if amount > 0:
+            budgets[name] = budgets.get(name, 0) + amount
+    return categories, budgets
 
 
 def report_section(ctx: AppContext, requests: list[Reimbursement]) -> None:
@@ -429,7 +460,7 @@ def report_section(ctx: AppContext, requests: list[Reimbursement]) -> None:
 
     st.divider()
     st.markdown("**AI 財務分析**")
-    st.caption("AI 會依這份報表整理財務狀況、提醒風險並給改善建議。分析結果不會分享到社團動態。")
+    st.caption("AI 會依這份報表整理財務狀況、提醒風險並給改善建議。分析結果不會放到成果分享。")
     if st.button("分析這份報表"):
         text = report_digest(title, summary, budgets, requests)
         review = ctx.run_ai(
@@ -527,7 +558,9 @@ def import_section(ctx: AppContext) -> None:
     def lookup(name: str) -> str:
         return next((key for label, key in names.items() if label and label in name), "")
 
-    items, skipped = import_rows(df.to_dict("records"), {k: v for k, v in mapping.items() if v}, status, lookup)
+    categories = get_settings(ctx.store, ctx.club_id).categories
+    items, skipped = import_rows(df.to_dict("records"), {k: v for k, v in mapping.items() if v}, status, lookup,
+                                 categories=categories)
     st.caption(f"可匯入 {len(items)} 筆，共 {sum(r.amount for r in items):,} 元" + (f"；略過 {len(skipped)} 筆" if skipped else ""))
     if skipped:
         with st.expander("略過的資料"):

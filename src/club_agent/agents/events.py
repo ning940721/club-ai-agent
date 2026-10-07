@@ -43,13 +43,19 @@ class EventPlanner:
         self.llm = llm
         self.retriever = retriever
 
-    def propose(self, club: ClubProfile, settings: ClubSettings, facts: str, extra: str = "") -> EventProposal:
+    def propose(
+        self, club: ClubProfile, settings: ClubSettings, facts: str, extra: str = "", budget_categories: list[str] | None = None
+    ) -> EventProposal:
         knowledge = format_context(self.retriever.search(facts, k=4)) if self.retriever else ""
         prompt = f"""<club>{club.name}：{club.positioning}；主要對象：{club.target_audience}</club>
 
 <departments>
 {_departments(settings)}
 </departments>
+
+<budget_categories>
+{"、".join(budget_categories or ["活動", "器材設備", "文宣印刷", "餐飲", "交通", "場地", "講師費", "雜支"])}
+</budget_categories>
 
 <event_department_details>
 {settings.details("events") or "（未填寫）"}

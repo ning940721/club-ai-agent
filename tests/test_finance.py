@@ -146,3 +146,26 @@ def test_google_form_import():
     r = items[0]
     assert (r.amount, r.invoice_no, r.receipt_date, r.paid_at, r.department, r.status) == (
         1250, "AB12345678", "2026-09-15", "2026-09-15", "events", PAID)
+
+
+def test_custom_budget_categories():
+    from club_agent.web.finance_pages import budget_from_editor
+
+    categories, budgets = budget_from_editor([
+        {"類別": "社課材料", "預算": 3000}, {"類別": " 餐飲 ", "預算": 2000}, {"類別": "", "預算": 500},
+        {"類別": "社課材料", "預算": 1000}, {"類別": "保險", "預算": None},
+    ])
+    assert categories == ["社課材料", "餐飲", "保險"] and budgets == {"社課材料": 4000, "餐飲": 2000}
+
+    fs = FinanceSettings(categories=categories, budgets=budgets)
+    old = approve(make_request(category="文宣印刷", amount=800), "財務")  # 已刪掉的類別仍有支出
+    rows = budget_rows(fs, [old], [], date(2026, 8, 1), date(2027, 1, 31))
+    assert [(b.category, b.budget, b.used, b.status) for b in rows] == [
+        ("社課材料", 4000, 0, "正常"), ("餐飲", 2000, 0, "正常"), ("文宣印刷", 0, 800, "未編預算"),
+    ]
+    assert "社課材料、餐飲、保險" in policy_markdown("測試社", fs)
+
+    columns = ["姓名", "項目", "金額", "類別"]
+    rows_in = [{"姓名": "a", "項目": "x", "金額": "100", "類別": "社課材料"}, {"姓名": "b", "項目": "y", "金額": "50", "類別": "其他"}]
+    items, _ = import_rows(rows_in, guess_mapping(columns), PAID, lambda _: "", categories=["社課材料", "保險"])
+    assert [r.category for r in items] == ["社課材料", "保險"]  # 沒有雜支時歸到最後一個類別

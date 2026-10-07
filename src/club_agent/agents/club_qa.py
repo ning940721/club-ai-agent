@@ -1,4 +1,4 @@
-"""社團問答 Agent：從會議記錄、社團動態與待辦中找答案，例如「上次開會決定了什麼？」。
+"""社團問答 Agent：從會議記錄、成果分享與待辦中找答案，例如「上次開會決定了什麼？」。
 
 和 MeetingQA 的差別：資料來源涵蓋全社團（不只會議記錄），並固定附上最近的會議重點與
 未完成待辦，讓「上次」「目前」這類沒有關鍵字的問題也找得到答案。
@@ -26,7 +26,7 @@ SYSTEM_PROMPT = """你是學生社團的資料小幫手，根據社團的會議�
 
 
 def club_retriever(docs: list[MeetingDoc], records: list[Record], settings_name=lambda k: k) -> BM25Retriever | None:
-    """把會議記錄與社團動態切成段落一起檢索。"""
+    """把會議記錄與成果分享切成段落一起檢索。"""
     meeting = build_retriever(docs)
     chunks: list[Chunk] = list(meeting.chunks) if meeting else []
     for r in records:

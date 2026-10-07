@@ -27,7 +27,7 @@ REIMBURSEMENTS, LEDGER, SETTINGS_COLLECTION, SETTINGS_ID = "reimbursements", "le
 
 PENDING, APPROVED, PAID, REJECTED = "待審核", "已核准", "已撥款", "退件"
 STATUSES = (PENDING, APPROVED, PAID, REJECTED)
-EXPENSE_CATEGORIES = ("活動", "器材設備", "文宣印刷", "餐飲", "交通", "場地", "講師費", "雜支")
+EXPENSE_CATEGORIES = ("活動", "器材設備", "文宣印刷", "餐飲", "交通", "場地", "講師費", "雜支")  # 預設的支出類別，社團可自行增減
 INCOME_CATEGORIES = ("社費", "學校補助", "贊助", "活動收入", "其他收入")
 PAYMENT_METHODS = ("現金", "轉帳")
 INCOME, EXPENSE = "收入", "支出"
@@ -99,6 +99,7 @@ class FinanceSettings(BaseModel):
     term_start: str = ""
     term_end: str = ""
     budgets: dict[str, int] = Field(default_factory=dict, description="支出類別 → 本學期預算")
+    categories: list[str] = Field(default_factory=lambda: list(EXPENSE_CATEGORIES), description="支出類別（預算項目），社團可自行增減")
 
     @property
     def has_pin(self) -> bool:
@@ -347,7 +348,8 @@ def budget_rows(
     for e in entries:
         if e.kind == EXPENSE and in_term(e.date):
             used[e.category] = used.get(e.category, 0) + e.amount
-    categories = [*EXPENSE_CATEGORIES, *[c for c in [*settings.budgets, *used, *pending] if c not in EXPENSE_CATEGORIES]]
+    # 社團設定的類別在前；已經刪掉但還有支出的舊類別也列出來，金額才不會消失
+    categories = [*settings.categories, *[c for c in [*settings.budgets, *used, *pending] if c not in settings.categories]]
     rows = [BudgetRow(c, settings.budgets.get(c, 0), used.get(c, 0), pending.get(c, 0)) for c in dict.fromkeys(categories)]
     return [r for r in rows if r.budget or r.used or r.pending]
 
@@ -520,7 +522,7 @@ def policy_markdown(club_name: str, settings: FinanceSettings) -> str:
 |---|---|
 | 申請人、部門 | 實際付錢、要收到撥款的人 |
 | 項目 | 具體寫出買了什麼，例：「成果展海報輸出 A1 × 5 張」 |
-| 類別 | {'、'.join(EXPENSE_CATEGORIES)} |
+| 類別 | {'、'.join(settings.categories)} |
 | 所屬活動 | 例：成果展、期初迎新；日常支出可空白 |
 | 金額 | 單據上的實付金額 |
 | 發票號碼／消費日期 | 照單據填寫 |
@@ -603,10 +605,13 @@ def parse_date(value) -> str | None:
 
 
 def import_rows(
-    rows: list[dict], mapping: dict[str, str], status: str, department_lookup, today: date | None = None
+    rows: list[dict], mapping: dict[str, str], status: str, department_lookup, today: date | None = None,
+    categories: list[str] | tuple[str, ...] = EXPENSE_CATEGORIES,
 ) -> tuple[list[Reimbursement], list[str]]:
-    """把表單回覆轉成報帳資料；回傳 (成功的資料, 略過的原因)。department_lookup 把部門名稱轉成代號。"""
+    """把表單回覆轉成報帳資料；回傳 (成功的資料, 略過的原因)。department_lookup 把部門名稱轉成代號；
+    類別不在 categories 裡的歸到「雜支」（社團刪掉雜支時歸到最後一個類別）。"""
     today = today or date.today()
+    fallback = "雜支" if "雜支" in categories else (categories[-1] if categories else "雜支")
     out, skipped = [], []
     for n, row in enumerate(rows, 2):  # 第 1 列是標題
         get = lambda field: str(row.get(mapping.get(field, ""), "") or "").strip()  # noqa: E731
@@ -619,7 +624,7 @@ def import_rows(
         out.append(
             Reimbursement(
                 applicant=get("applicant"), department=department_lookup(get("department")), item=get("item"),
-                category=category if category in EXPENSE_CATEGORIES else "雜支", amount=amount,
+                category=category if category in categories else fallback, amount=amount,
                 invoice_no=normalize_invoice(get("invoice_no")), receipt_date=day, activity=get("activity"),
                 note=get("note"), status=status, paid_at=day if status == PAID else "",
                 created_at=f"{day}T00:00:00", source="Google 表單匯入",

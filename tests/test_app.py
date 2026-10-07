@@ -259,7 +259,7 @@ def test_shared_features_live_in_sidebar():
     _switch(at, "marketing")
     labels = [t.label for t in at.tabs]
     assert labels == ["社群數據診斷", "活動宣傳企劃", "部門顧問"]
-    for page, title in (("tasks", "待辦與進度"), ("feed", "社團動態"), ("calendar", "行事曆"), ("reimburse", "報帳申請")):
+    for page, title in (("tasks", "待辦與進度"), ("feed", "成果分享"), ("calendar", "行事曆"), ("reimburse", "報帳申請")):
         _open(at, page)
         assert title in _page_title(at)
     _switch(at, "pr")  # 換部門時回到部門功能
@@ -275,12 +275,12 @@ def test_advice_not_shared_until_officer_chooses():
     _button(at, "取得建議").click().run()
     assert any("先做預算表" in m.value for m in at.markdown)
     _open(at, "feed")
-    assert not any("成果展預算怎麼分配？" in m.value for m in at.markdown)  # 沒有出現在社團動態
+    assert not any("成果展預算怎麼分配？" in m.value for m in at.markdown)  # 沒有出現在成果分享
 
     _button(at, "返回部門功能").click().run()
     at.button(key="share_btn_advice_finance").click().run()
     assert not at.exception
-    assert any("已分享到社團動態" in c.value for c in at.caption)
+    assert any("已放到「成果分享」" in c.value for c in at.caption)
     _open(at, "feed")
     assert any("成果展預算怎麼分配？" in m.value for m in at.markdown)
 
@@ -303,7 +303,7 @@ def test_edited_template_agenda_can_be_shared():
     _button(at, "使用基本議程（不使用 AI）").click().run()
     at.button(key="share_btn_brief").click().run()
     assert not at.exception
-    assert any("已分享到社團動態" in c.value for c in at.caption)
+    assert any("已放到「成果分享」" in c.value for c in at.caption)
     _open(at, "feed")
     assert any("幹部會議議程" in m.value for m in at.markdown)
 

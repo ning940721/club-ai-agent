@@ -12,7 +12,8 @@ import streamlit as st
 from ..agents import EventPlanner
 from ..departments import department_retriever
 from ..export import ExportError, pdf_available
-from ..finance import EXPENSE_CATEGORIES, list_requests
+from ..finance import get_settings as finance_settings
+from ..finance import list_requests
 from ..projects import (
     STAGES,
     EventProject,
@@ -169,7 +170,9 @@ def proposal_tab(ctx: AppContext, p: EventProject) -> None:
     if clicked:
         proposal = ctx.run_ai(
             "撰寫企劃書中（約 1 分鐘）…",
-            lambda llm, _s: EventPlanner(llm, _events_retriever()).propose(ctx.club, ctx.settings, p.facts(), extra),
+            lambda llm, _s: EventPlanner(llm, _events_retriever()).propose(
+                ctx.club, ctx.settings, p.facts(), extra, finance_settings(ctx.store, ctx.club_id).categories
+            ),
         )
         if proposal:
             updated = p.model_copy(update={
@@ -196,10 +199,12 @@ def proposal_tab(ctx: AppContext, p: EventProject) -> None:
         "金額": pd.Series([b.amount for b in p.budget_lines], dtype="int64"),
         "說明": pd.Series([b.note for b in p.budget_lines], dtype="object"),
     })
+    # 類別沿用財務設定的預算類別（只是類別名稱，不含任何金額）；保留企劃書裡已經用到的類別
+    categories = list(dict.fromkeys([*finance_settings(ctx.store, ctx.club_id).categories, *[b.category for b in p.budget_lines]]))
     edited = st.data_editor(
         df, key=f"budget_lines_{p.id}", num_rows="dynamic", hide_index=True, width="stretch",
         column_config={
-            "類別": st.column_config.SelectboxColumn(options=list(EXPENSE_CATEGORIES)),
+            "類別": st.column_config.SelectboxColumn(options=categories),
             "金額": st.column_config.NumberColumn(min_value=0, step=100, format="%,d"),
         },
     )

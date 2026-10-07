@@ -308,7 +308,7 @@ class RundownItem(BaseModel):
 
 class BudgetLine(BaseModel):
     item: str = Field(description="支出項目")
-    category: str = Field(description="類別：活動、器材設備、文宣印刷、餐飲、交通、場地、講師費、雜支 其中之一")
+    category: str = Field(description="類別：必須是 <budget_categories> 中的其中一個")
     amount: int = Field(description="預估金額（元）；不確定時依一般行情估算，並在 note 註明「估算」")
     note: str = Field(description="說明；沒有時填空字串")
 
