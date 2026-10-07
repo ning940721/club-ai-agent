@@ -34,17 +34,18 @@ class ClubProfile(BaseModel):
 class PostRecord(BaseModel):
     """單篇貼文的成效數據（可由 IG/FB 洞察報告匯出後整理為 CSV）。"""
 
-    date: str = Field(description="發文日期 YYYY-MM-DD")
-    time: str = Field(default="", description="發文時間 HH:MM")
-    platform: str
-    post_type: str = Field(description="貼文形式，如：圖文、輪播、Reels、限動")
-    topic: str = Field(description="貼文主題分類，如：活動宣傳、幹部介紹、社課花絮")
-    reach: int = 0
-    likes: int = 0
-    comments: int = 0
-    shares: int = 0
-    saves: int = 0
-    followers: int = Field(default=0, description="發文當下粉絲數")
+    date: str = Field(description="發文日期 YYYY-MM-DD（唯一必填）")
+    time: str = Field(default="", description="發文時間 HH:MM；不知道時空白")
+    platform: str = ""
+    post_type: str = Field(default="", description="貼文形式，如：圖文、輪播、Reels、限動")
+    topic: str = Field(default="", description="貼文主題分類，如：活動宣傳、幹部介紹、社課花絮")
+    # 數字欄位：None 代表「不知道」，和 0 不同，計算平均時會排除
+    reach: int | None = None
+    likes: int | None = None
+    comments: int | None = None
+    shares: int | None = None
+    saves: int | None = None
+    followers: int | None = Field(default=None, description="發文當下粉絲數")
     caption: str = ""
 
 

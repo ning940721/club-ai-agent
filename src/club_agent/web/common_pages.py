@@ -13,6 +13,7 @@ from ..departments import DEPARTMENTS, ClubSettings, DepartmentConfig, departmen
 from ..meetings import list_meetings
 from ..report import advice_markdown, meeting_answer_markdown
 from ..schemas import ClubProfile
+from ..metrics import TEMPLATE_CSV
 from ..store import StoreError, activity_digest
 from ..tasks import STATUSES, Task, delete_task, list_tasks, save_task, tasks_digest
 from .context import AppContext, download_buttons
@@ -30,26 +31,8 @@ def get_department_retriever(key: str):
 # ---------------------------------------------------------------------------
 
 
-QA_EXAMPLES = ("上次開會決定了什麼？", "下次開會是什麼時候？", "目前有哪些逾期的任務？")
-MODE_QA, MODE_ADVICE = "快速問答", "顧問建議"
-
-
 def advisor_page(ctx: AppContext) -> None:
-    mode = st.segmented_control(
-        "想做什麼？",
-        [MODE_QA, MODE_ADVICE],
-        default=MODE_ADVICE,
-        key=f"advisor_mode_{ctx.dept_key}",
-        help="快速問答：從會議記錄、各部門分享的成果與待辦中直接找答案。顧問建議：針對狀況給行動步驟與可用的文件模板。",
-    )
-    if mode == MODE_QA:
-        quick_qa(ctx)
-    else:
-        advice_section(ctx)
-
-
-def quick_qa(ctx: AppContext) -> None:
-    club_qa_box(ctx, f"dept_{ctx.dept_key}", QA_EXAMPLES)
+    advice_section(ctx)
 
 
 AGENT_EXAMPLES = ("下次發文時間是什麼時候？", "上次開會決定了什麼？", "這個月有哪些活動？", "目前有哪些逾期的任務？")
@@ -368,13 +351,12 @@ def settings_page(ctx: AppContext) -> None:
 # ---------------------------------------------------------------------------
 
 
-def help_page(csv_columns: list[str]) -> None:
+def help_page() -> None:
     st.markdown(
         """
 ### 怎麼使用
 1. 在左側選擇**我的部門**，上方會直接列出這個部門的功能，最後一個分頁是**部門顧問**：
-   - 快速問答：直接問社團的事，例如「上次開會決定了什麼？」，AI 會從會議記錄、各部門分享的成果與待辦找答案並附出處
-   - 顧問建議：描述遇到的狀況，取得行動步驟與可直接使用的文件模板
+   描述遇到的狀況，取得行動步驟與可直接使用的文件模板；想查社團的事（例如上次開會決定了什麼）請用左側的「AI Agent 問答」
 2. 各部門的專屬功能：
    - 社長：社團總覽（各部門進度、會議時間表與議程、追蹤上次會議未決議的議題）；財務管理
    - 會議記錄：記錄問答、新增記錄（自動整理重點並對照會前議程）、所有記錄
@@ -395,20 +377,23 @@ def help_page(csv_columns: list[str]) -> None:
 在 LINE 聊天室右上角選單 →「設定」→「傳送聊天記錄」，存成 .txt 檔後到「會議記錄」上傳。
 
 ### 怎麼準備貼文數據 CSV（行銷）
-從 IG／FB 的「洞察報告」把每篇貼文的數據填進 CSV 範本，一列一篇，建議至少近三個月。
+- **最簡單：** 從 Meta Business Suite（或 IG 專業主控板）的洞察報告匯出貼文 CSV，直接上傳，系統會自動對應欄位。
+- **自己整理：** 下載下方的範本，一列一篇貼文，建議至少近三個月。欄位名稱用中文或英文都可以。
+- **只有日期一定要填**，其他不知道就空著。空白會當成「不知道」，不會當成 0；分析時會排除，AI 也會知道少了什麼。
 
-| 欄位 | 填什麼 |
-|---|---|
-| date / time | 發文日期（2026-09-28）與時間（21:30） |
-| platform | Instagram、Facebook、Dcard… |
-| post_type | 圖文、輪播、Reels、公告、限動… |
-| topic | 你們自己的分類，例如：活動宣傳、社課花絮 |
-| reach | 觸及人數 |
-| likes / comments / shares / saves | 按讚、留言、分享、收藏數 |
-| followers / caption | 發文當下粉絲數、貼文內文（選填） |
+| 欄位 | 填什麼 | 沒填會怎樣 |
+|---|---|---|
+| 日期＊ | 發文日期（2026-09-28、2026/9/28 都可以；也可以連同時間寫在一起） | 這篇不列入分析 |
+| 時間 | 發文時間（21:30、下午 9:30） | 不列入發文時段分析 |
+| 平台 | Instagram、Facebook… | 上傳時選一次整份檔案的平台即可 |
+| 形式／主題 | 圖文、輪播、Reels…；你們自己的分類，例如：活動宣傳 | 不列入依形式／主題的比較 |
+| 觸及人數 | 看過這篇的人數（建議盡量填） | 無法計算這篇的互動率 |
+| 按讚／留言／分享／收藏 | 互動數；IG 沒有分享數就空著 | 互動率只用有填的項目計算 |
+| 粉絲數／內文 | 發文當下粉絲數、貼文內容 | 無法分析粉絲成長；AI 只能依數字分析 |
+
 """
     )
-    template = ",".join(csv_columns) + "\n2026-09-01,21:00,Instagram,輪播,活動宣傳,850,60,5,4,12,1200,範例貼文\n"
+    template = TEMPLATE_CSV
     st.download_button("下載 CSV 範本", template.encode("utf-8-sig"), file_name="貼文數據範本.csv", mime="text/csv")
     st.markdown(
         """

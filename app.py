@@ -43,7 +43,6 @@ from club_agent.web.pr_pages import pr_tabs  # noqa: E402
 from club_agent.web.president_pages import president_page  # noqa: E402
 from club_agent.web.speaker_pages import speaker_tabs  # noqa: E402
 
-CSV_COLUMNS = ["date", "time", "platform", "post_type", "topic", "reach", "likes", "comments", "shares", "saves", "followers", "caption"]
 
 st.set_page_config(page_title="社團營運平台", page_icon=":material/groups:", layout="wide")
 inject_css()
@@ -138,7 +137,7 @@ SHARED_PAGES = {
 }
 OTHER_PAGES = {
     "settings": ("社團設定", ":material/settings:", settings_page),
-    "help": ("使用說明", ":material/help:", lambda _ctx: help_page(CSV_COLUMNS)),
+    "help": ("使用說明", ":material/help:", lambda _ctx: help_page()),
 }
 SIDE_PAGES = {**SHARED_PAGES, **OTHER_PAGES}
 

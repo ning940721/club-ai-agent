@@ -285,18 +285,6 @@ def test_advice_not_shared_until_officer_chooses():
     assert any("成果展預算怎麼分配？" in m.value for m in at.markdown)
 
 
-def test_quick_qa_answers_from_club_records():
-    at = _app()
-    _signup(at)
-    _switch(at, "pr")
-    at.session_state["advisor_mode_pr"] = "快速問答"  # AppTest 尚不支援操作 segmented_control
-    at.run()
-    _button(at, "上次開會決定了什麼？").click().run()
-    next(b for b in at.button if b.label == "提問").click().run()
-    assert not at.exception
-    assert any("下次幹部會是 12/4 19:00" in m.value for m in at.markdown)
-
-
 def test_edited_template_agenda_can_be_shared():
     at = _app()
     _signup(at)

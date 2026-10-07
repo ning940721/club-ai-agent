@@ -68,16 +68,22 @@ def trials_report(trials: list[TrialRecord]) -> str:
 
 
 def compare_metrics(before: MetricsSummary, after: MetricsSummary) -> str:
-    def change(a: float, b: float) -> str:
-        return f"{(b - a) / a:+.1%}" if a else "N/A"
+    def change(a: float | None, b: float | None) -> str:
+        return f"{(b - a) / a:+.1%}" if a and b is not None else "N/A"
+
+    def num(v: float | None) -> str:
+        return "—" if v is None else f"{v:.0f}"
+
+    def pct(v: float | None) -> str:
+        return "—" if v is None else f"{v:.2%}"
 
     return "\n".join(
         [
             "| 指標 | 導入前 | 導入後 | 變化 |",
             "|---|---|---|---|",
             f"| 貼文數 | {before.total_posts} | {after.total_posts} | |",
-            f"| 平均觸及 | {before.avg_reach:.0f} | {after.avg_reach:.0f} | {change(before.avg_reach, after.avg_reach)} |",
-            f"| 平均互動率 | {before.avg_engagement_rate:.2%} | {after.avg_engagement_rate:.2%} "
+            f"| 平均觸及 | {num(before.avg_reach)} | {num(after.avg_reach)} | {change(before.avg_reach, after.avg_reach)} |",
+            f"| 平均互動率 | {pct(before.avg_engagement_rate)} | {pct(after.avg_engagement_rate)} "
             f"| {change(before.avg_engagement_rate, after.avg_engagement_rate)} |",
         ]
     )
