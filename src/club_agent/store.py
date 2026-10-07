@@ -43,7 +43,7 @@ class Record(BaseModel):
     department: str = Field(description="部門 key，如 marketing、finance")
     kind: str = Field(description="advice（部門顧問）、diagnosis（數據診斷）、campaign（宣傳企劃）")
     title: str = Field(description="問題或活動名稱")
-    summary: str = Field(description="一兩句摘要，顯示在成果分享")
+    summary: str = Field(description="一兩句摘要，顯示在「AI Agent 問答」的分享列表")
     markdown: str = Field(description="完整內容")
 
 

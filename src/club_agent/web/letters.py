@@ -24,7 +24,7 @@ def letter_workbench(
     download_name: str = "",
     department: str | None = None,
 ) -> None:
-    """kinds：信件類型 → 寫作指引。notice_kinds 是給社員的通知（不寄信，可放到成果分享）。
+    """kinds：信件類型 → 寫作指引。notice_kinds 是給社員的通知（不寄信，可分享給其他部門）。
     on_save(kind, message) 負責存檔並重新整理頁面。"""
     c1, c2 = st.columns([2, 3])
     kind = c1.selectbox("要寫什麼", list(kinds), key=f"{key}_kind")

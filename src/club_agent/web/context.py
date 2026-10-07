@@ -118,10 +118,10 @@ class AppContext:
             Record(department=department or self.dept_key, kind=kind, title=title, summary=summary, markdown=markdown),
         )
 
-    # 放到成果分享：幹部可以決定這次的結果要不要讓其他部門看到
+    # 分享給其他部門：幹部可以決定這次的結果要不要讓其他部門看到
 
     def share_toggle(self, key: str) -> bool:
-        return st.toggle("完成後放到「成果分享」", value=True, key=f"share_{key}", help="關閉後結果只有你看得到；之後仍可按「放到成果分享」")
+        return st.toggle("完成後分享給其他部門", value=True, key=f"share_{key}", help="分享的內容會出現在「AI Agent 問答」，其他部門看得到，AI 也能用來回答問題；關閉後只有你看得到，之後仍可按「分享給其他部門」")
 
     def keep_result(
         self, key: str, kind: str, title: str, summary: str, markdown: str, share: bool, department: str | None = None
@@ -141,8 +141,8 @@ class AppContext:
         if not item:
             return
         if item["shared"]:
-            st.caption("已放到「成果分享」，其他部門看得到。")
-        elif st.button("放到成果分享", key=f"share_btn_{key}", icon=":material/share:"):
+            st.caption("已分享，其他部門可以在「AI Agent 問答」查看。")
+        elif st.button("分享給其他部門", key=f"share_btn_{key}", icon=":material/share:"):
             self._share(item)
             st.rerun()
 

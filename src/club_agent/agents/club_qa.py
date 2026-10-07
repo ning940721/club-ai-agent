@@ -1,4 +1,4 @@
-"""社團問答 Agent：從會議記錄、成果分享與待辦中找答案，例如「上次開會決定了什麼？」。
+"""社團問答 Agent：從會議記錄、各部門分享的成果與待辦中找答案，例如「上次開會決定了什麼？」。
 
 和 MeetingQA 的差別：資料來源涵蓋全社團（不只會議記錄），並固定附上最近的會議重點與
 未完成待辦，讓「上次」「目前」這類沒有關鍵字的問題也找得到答案。
@@ -14,7 +14,7 @@ from ..retriever import BM25Retriever, Chunk, format_context, split_markdown
 from ..schemas import MeetingAnswer
 from ..store import Record
 
-SYSTEM_PROMPT = """你是學生社團的資料小幫手，根據社團的會議記錄、各部門的紀錄與待辦清單回答幹部的問題。
+SYSTEM_PROMPT = """你是學生社團的 AI Agent，根據社團的會議記錄、各部門分享的成果（診斷報告、企劃、顧問建議…）、待辦清單與行事曆回答幹部的問題。
 
 工作原則：
 - 只能根據提供的資料回答；找不到答案時 found 設為 false，說明資料中沒有提到，並建議可以去哪裡補資料，絕不猜測。
@@ -26,7 +26,7 @@ SYSTEM_PROMPT = """你是學生社團的資料小幫手，根據社團的會議�
 
 
 def club_retriever(docs: list[MeetingDoc], records: list[Record], settings_name=lambda k: k) -> BM25Retriever | None:
-    """把會議記錄與成果分享切成段落一起檢索。"""
+    """把會議記錄與各部門分享的成果切成段落一起檢索。"""
     meeting = build_retriever(docs)
     chunks: list[Chunk] = list(meeting.chunks) if meeting else []
     for r in records:
@@ -48,6 +48,7 @@ class ClubQA:
         retriever: BM25Retriever | None,
         tasks_text: str,
         today: date,
+        calendar_text: str = "",
     ) -> str:
         context = format_context(retriever.search(question, k=8)) if retriever else "（沒有任何紀錄）"
         return f"""<today>{today.isoformat()}</today>
@@ -64,6 +65,10 @@ class ClubQA:
 {tasks_text}
 </open_tasks>
 
+<calendar>
+{calendar_text or "（行事曆沒有資料）"}
+</calendar>
+
 <related_records>
 {context}
 </related_records>
@@ -79,6 +84,7 @@ class ClubQA:
         retriever: BM25Retriever | None,
         tasks_text: str,
         today: date | None = None,
+        calendar_text: str = "",
     ) -> MeetingAnswer:
-        prompt = self.build_prompt(question, docs, retriever, tasks_text, today or date.today())
+        prompt = self.build_prompt(question, docs, retriever, tasks_text, today or date.today(), calendar_text)
         return self.llm.structured(SYSTEM_PROMPT, prompt, MeetingAnswer)

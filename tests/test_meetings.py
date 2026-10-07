@@ -191,3 +191,20 @@ def test_club_qa_searches_meetings_records_and_tasks():
     assert "咖啡廳 A 已回覆願意贊助" in prompt
     assert "[2026-10-03 第 5 次幹部會] 討論成果展" in prompt  # 「上次開會」靠最近會議重點回答
     assert "- 待辦｜寄贊助信" in prompt
+
+
+def test_club_qa_finds_posting_time_and_uses_calendar():
+    from club_agent.agents import ClubQA, club_retriever
+    from club_agent.store import Record
+
+    diagnosis = Record(department="marketing", kind="diagnosis", title="社群數據診斷", summary="", markdown=(
+        "# 範例攝影社 社群數據診斷報告\n\n## 總結\n觸及下滑\n\n## 最佳發文時機\n"
+        "| 平台 | 星期 | 時段 |\n|---|---|---|\n| Instagram | 週日 | 21:00-23:00 |\n"))
+    other = Record(department="pr", kind="advice", title="贊助信", summary="", markdown="# 贊助\n\n## 名單\n咖啡廳願意贊助")
+    llm = FakeLLM({MeetingAnswer: [MeetingAnswer(found=True, answer="週日 21:00", sources=[])]})
+    retriever = club_retriever([], [other, diagnosis])
+    ClubQA(llm).run("下次發文時間是什麼時候？", [], retriever, "（無）", date(2026, 10, 7),
+                    "- 2026-10-11 整天｜活動｜IG 發文：成果展預告（來源：自行新增）")
+    prompt = llm.calls[0][1]
+    assert "最佳發文時機" in prompt and "21:00-23:00" in prompt
+    assert "<calendar>\n- 2026-10-11 整天｜活動｜IG 發文：成果展預告" in prompt

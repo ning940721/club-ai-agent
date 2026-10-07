@@ -132,7 +132,7 @@ if st.session_state.get("dept") not in enabled:
 # 側邊欄的頁面：幹部共用的功能，以及不常用的社團設定、使用說明。點選後主畫面改顯示該頁，選部門或按「返回」回到部門功能
 SHARED_PAGES = {
     "tasks": ("待辦與進度", ":material/checklist:", tasks_page),
-    "feed": ("成果分享", ":material/forum:", feed_page),
+    "feed": ("AI Agent 問答", ":material/smart_toy:", feed_page),
     "calendar": ("行事曆", ":material/calendar_month:", calendar_page),
     "reimburse": ("報帳申請", ":material/receipt_long:", reimburse_page),
 }
@@ -192,7 +192,7 @@ page_header(ctx.dept_name, club.name, beta=DEPARTMENTS[dept_key].beta)
 if not API_KEY:
     st.error("網站尚未設定 GEMINI_API_KEY，請管理者到 Secrets 設定（見 docs/deploy.md）。")
 
-# 各部門的功能直接列在上方分頁；部門顧問放最後。待辦、成果分享、行事曆、報帳在側邊欄「幹部共用」。
+# 各部門的功能直接列在上方分頁；部門顧問放最後。待辦、AI Agent 問答、行事曆、報帳在側邊欄「幹部共用」。
 # 有些部門的功能需要先在分頁上方選擇對象（例如活動），所以先取得分頁清單（會先畫出上方的選單），再建立分頁。
 pages: list[tuple[str, Callable[[], None]]] = []
 if FEATURE_PRESIDENT in features:

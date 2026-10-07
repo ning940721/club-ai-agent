@@ -92,8 +92,8 @@ def add_section(ctx: AppContext) -> None:
     col_a, col_b = st.columns(2)
     summarize_clicked = col_a.button("整理重點並儲存", type="primary", key="m_summarize")
     save_only_clicked = col_b.button("只儲存，不整理（不使用 AI 額度）", key="m_save_only")
-    st.toggle("整理後把重點放到「成果分享」", value=True, key="share_meeting",
-              help="記錄本身一定會存在「會議記錄」裡，可以提問；這個選項只決定重點要不要出現在成果分享")
+    st.toggle("整理後把重點分享給其他部門", value=True, key="share_meeting",
+              help="記錄本身一定會存在「會議記錄」裡，可以提問；這個選項只決定重點要不要出現在「AI Agent 問答」")
     if not (summarize_clicked or save_only_clicked):
         return
     try:

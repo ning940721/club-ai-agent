@@ -97,3 +97,14 @@ def test_ics_export():
     assert "SUMMARY:期中社課\\, 第 3 堂" in ics
     assert "DTSTART;VALUE=DATE:20261025" in ics and "DTEND;VALUE=DATE:20261026" in ics
     assert "SUMMARY:[公關] 報名截止" in ics
+
+
+def test_events_digest_window():
+    from club_agent.events import events_digest
+
+    events = [CalendarEvent(date="2026-09-01", title="太久以前"), CalendarEvent(date="2026-10-01", title="上週社課", time="19:00"),
+              CalendarEvent(date="2026-12-20", title="成果展", location="學活", department="events"),
+              CalendarEvent(date="2027-03-01", title="太遠")]
+    text = events_digest(events, date(2026, 10, 7), settings=ClubSettings.default())
+    assert "太久以前" not in text and "太遠" not in text
+    assert "- 2026-10-01 19:00｜活動｜上週社課" in text and "［活動］成果展，學活" in text

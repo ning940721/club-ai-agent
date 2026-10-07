@@ -156,6 +156,20 @@ def upcoming(events: list[CalendarEvent], today: date, days: int | None = None) 
     return [e for e in events if today.isoformat() <= e.date <= last]
 
 
+def events_digest(events: list[CalendarEvent], today: date, past_days: int = 14, future_days: int = 90,
+                  settings: ClubSettings | None = None) -> str:
+    """給 AI 問答用的行事曆摘要：最近兩週到未來三個月。"""
+    first = (today - timedelta(days=past_days)).isoformat()
+    last = (today + timedelta(days=future_days)).isoformat()
+    lines = []
+    for e in events:
+        if first <= e.date <= last:
+            dept = f"［{settings.name(e.department)}］" if settings and e.department else ""
+            where = f"，{e.location}" if e.location else ""
+            lines.append(f"- {e.date} {e.when()}｜{e.kind}｜{dept}{e.title}{where}（來源：{e.source}）")
+    return "\n".join(lines)
+
+
 # ---------------------------------------------------------------------------
 # 匯出 .ics（Google 日曆：設定 → 匯入與匯出 → 匯入）
 # ---------------------------------------------------------------------------

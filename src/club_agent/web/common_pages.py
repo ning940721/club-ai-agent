@@ -1,4 +1,4 @@
-"""所有部門共用的頁面：部門顧問、待辦與進度、成果分享、社團設定（後台）、使用說明。"""
+"""所有部門共用的頁面：部門顧問、待辦與進度、AI Agent 問答、社團設定（後台）、使用說明。"""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ import pandas as pd
 import streamlit as st
 
 from ..agents import ClubQA, DepartmentAdvisor, club_retriever
+from ..events import club_events, events_digest
 from ..departments import DEPARTMENTS, ClubSettings, DepartmentConfig, department_retriever
 from ..meetings import list_meetings
 from ..report import advice_markdown, meeting_answer_markdown
@@ -39,7 +40,7 @@ def advisor_page(ctx: AppContext) -> None:
         [MODE_QA, MODE_ADVICE],
         default=MODE_ADVICE,
         key=f"advisor_mode_{ctx.dept_key}",
-        help="快速問答：從會議記錄、成果分享與待辦中直接找答案。顧問建議：針對狀況給行動步驟與可用的文件模板。",
+        help="快速問答：從會議記錄、各部門分享的成果與待辦中直接找答案。顧問建議：針對狀況給行動步驟與可用的文件模板。",
     )
     if mode == MODE_QA:
         quick_qa(ctx)
@@ -48,32 +49,43 @@ def advisor_page(ctx: AppContext) -> None:
 
 
 def quick_qa(ctx: AppContext) -> None:
-    st.caption("從社團的會議記錄、各部門紀錄與待辦中找答案，並附上出處。")
-    q_key = f"qa_question_{ctx.dept_key}"
-    cols = st.columns(len(QA_EXAMPLES))
-    for i, example in enumerate(QA_EXAMPLES):
-        if cols[i].button(example, key=f"qa_ex_{ctx.dept_key}_{i}", width="stretch"):
-            st.session_state[q_key] = example
-    with st.form(f"club_qa_{ctx.dept_key}", clear_on_submit=False, border=False):
-        question = st.text_input("想查什麼？", key=q_key, placeholder="例：成果展預算最後決定多少？")
-        submitted = st.form_submit_button("提問", type="primary")
-    if submitted:
-        if not question.strip():
+    club_qa_box(ctx, f"dept_{ctx.dept_key}", QA_EXAMPLES)
+
+
+AGENT_EXAMPLES = ("下次發文時間是什麼時候？", "上次開會決定了什麼？", "這個月有哪些活動？", "目前有哪些逾期的任務？")
+
+
+def club_qa_box(ctx: AppContext, key: str, examples: tuple[str, ...]) -> None:
+    """問答搜尋欄：從會議記錄、各部門分享的成果、待辦與行事曆找答案並附出處。"""
+    q_key = f"qa_question_{key}"
+    with st.form(f"club_qa_{key}", clear_on_submit=False, border=False):
+        c1, c2 = st.columns([5, 1], vertical_alignment="bottom")
+        question = c1.text_input("想查什麼？", key=q_key, placeholder="例：下次發文時間是什麼時候？成果展預算最後決定多少？")
+        submitted = c2.form_submit_button("提問", type="primary", width="stretch")
+    cols = st.columns(len(examples))
+    for i, example in enumerate(examples):
+        if cols[i].button(example, key=f"qa_ex_{key}_{i}", width="stretch", type="tertiary"):
+            st.session_state[f"{q_key}_pending"] = example
+    pending = st.session_state.pop(f"{q_key}_pending", None)
+    if submitted or pending:
+        q = (pending or question or "").strip()
+        if not q:
             st.warning("請先輸入問題")
         else:
-            q = question.strip()
+            today = date.today()
 
             def ask(llm, _status):
                 docs = list_meetings(ctx.store, ctx.club_id)
                 records = ctx.store.list_records(ctx.club_id, limit=60)
-                tasks = tasks_digest(list_tasks(ctx.store, ctx.club_id), ctx.settings, date.today())
-                return ClubQA(llm).run(q, docs, club_retriever(docs, records, ctx.settings.name), tasks)
+                tasks = tasks_digest(list_tasks(ctx.store, ctx.club_id), ctx.settings, today)
+                calendar = events_digest(club_events(ctx.store, ctx.club_id, ctx.settings), today, settings=ctx.settings)
+                return ClubQA(llm).run(q, docs, club_retriever(docs, records, ctx.settings.name), tasks, today, calendar)
 
             # 問答只需要從資料找答案，用最低思考程度回應最快
-            answer = ctx.run_ai("翻閱社團紀錄中…", ask, thinking="minimal")
+            answer = ctx.run_ai("翻閱社團資料中…", ask, thinking="minimal")
             if answer:
                 st.session_state.setdefault("club_qa_history", []).insert(0, meeting_answer_markdown(q, answer))
-    for i, md in enumerate(st.session_state.get("club_qa_history", [])):
+    for i, md in enumerate(st.session_state.get("club_qa_history", [])[:5]):
         if i:
             st.divider()
         st.markdown(md)
@@ -241,19 +253,23 @@ def tasks_page(ctx: AppContext) -> None:
 
 
 # ---------------------------------------------------------------------------
-# 成果分享
+# AI Agent 問答（問答搜尋＋各部門分享的成果）
 # ---------------------------------------------------------------------------
 
 
 def feed_page(ctx: AppContext) -> None:
-    st.subheader("全社團各部門的提問與成果")
-    st.caption("各部門的顧問建議、會議重點、診斷與企劃都會出現在這裡，方便掌握彼此進度。")
+    st.caption("直接問社團的事，AI Agent 會從各部門分享的成果、會議記錄、待辦與行事曆找答案並附上出處。")
+    club_qa_box(ctx, "agent", AGENT_EXAMPLES)
+
+    st.divider()
+    st.subheader("各部門分享的成果")
+    st.caption("各部門分享的顧問建議、會議重點、診斷與企劃都在這裡，AI Agent 也會用這些內容回答問題。")
     all_records = ctx.store.list_records(ctx.club_id)
     keys = ctx.settings.enabled_keys() + sorted({r.department for r in all_records} - set(ctx.settings.enabled_keys()))
     chosen = st.selectbox("篩選部門", ["all", *keys], format_func=lambda k: "全部部門" if k == "all" else ctx.settings.label(k))
     records = [r for r in all_records if chosen == "all" or r.department == chosen][:50]
     if not records:
-        st.info("還沒有任何紀錄，先到「部門顧問」問第一個問題吧！")
+        st.info("還沒有任何分享，各部門產生報告或建議時打開「分享給其他部門」就會出現在這裡。")
         return
     if chosen == "all":
         counts = pd.Series([r.department for r in all_records]).value_counts()
@@ -357,7 +373,7 @@ def help_page(csv_columns: list[str]) -> None:
         """
 ### 怎麼使用
 1. 在左側選擇**我的部門**，上方會直接列出這個部門的功能，最後一個分頁是**部門顧問**：
-   - 快速問答：直接問社團的事，例如「上次開會決定了什麼？」，AI 會從會議記錄、成果分享與待辦找答案並附出處
+   - 快速問答：直接問社團的事，例如「上次開會決定了什麼？」，AI 會從會議記錄、各部門分享的成果與待辦找答案並附出處
    - 顧問建議：描述遇到的狀況，取得行動步驟與可直接使用的文件模板
 2. 各部門的專屬功能：
    - 社長：社團總覽（各部門進度、會議時間表與議程、追蹤上次會議未決議的議題）；財務管理
@@ -369,7 +385,7 @@ def help_page(csv_columns: list[str]) -> None:
    - 財務（社長也看得到）：輸入財務密碼後，有報帳審核、收支帳簿、預算、財務報表（Excel／Word／PDF）、規範與設定
 3. **幹部共用**（左側選單）：全體幹部都會用到的功能，點選後主畫面會切換過去，按「返回部門功能」回來
    - 待辦與進度：每位幹部都可以新增、更新任務；預設只顯示自己部門，可以切換看全部
-   - 成果分享：各部門分享的成果，彼此看得到；每次產生結果時可以選擇要不要分享
+   - AI Agent 問答：上方可以直接提問（例：下次發文時間是什麼時候？），AI 會從各部門分享的成果、會議記錄、待辦與行事曆找答案；下方列出各部門分享的成果，產生結果時可以選擇要不要分享
    - 行事曆：幹部會議、活動、講座、會議記錄提到的日期、待辦與追蹤期限、各部門新增的行程；可以匯出到 Google 日曆
    - 報帳申請：申請報帳並用報帳編號查詢進度；單據正本請交給財務
 4. **社團設定**（左側選單下方）：選擇社團有哪些部門、改部門名稱、填寫部門細節、修改密碼。

@@ -201,7 +201,7 @@ def finance_tabs(ctx: AppContext) -> list[tuple[str, Callable[[], None]]]:
     requests = list_requests(ctx.store, ctx.club_id)
     pending = sum(r.status == PENDING for r in requests)
     c1, c2 = st.columns([5, 1])
-    c1.caption("財務資料只有財務與社長看得到，內容不會出現在成果分享。")
+    c1.caption("財務資料只有財務與社長看得到，內容不會分享給其他部門。")
     if c2.button("鎖定", icon=":material/lock:", type="tertiary"):
         st.session_state.pop("finance_unlocked", None)
         st.rerun()
@@ -460,7 +460,7 @@ def report_section(ctx: AppContext, requests: list[Reimbursement]) -> None:
 
     st.divider()
     st.markdown("**AI 財務分析**")
-    st.caption("AI 會依這份報表整理財務狀況、提醒風險並給改善建議。分析結果不會放到成果分享。")
+    st.caption("AI 會依這份報表整理財務狀況、提醒風險並給改善建議。分析結果不會分享給其他部門。")
     if st.button("分析這份報表"):
         text = report_digest(title, summary, budgets, requests)
         review = ctx.run_ai(
