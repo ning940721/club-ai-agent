@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, time
+from typing import Callable
 
 import pandas as pd
 import streamlit as st
@@ -46,19 +47,16 @@ def _flash(message: str) -> None:
     st.rerun()
 
 
-def speakers_page(ctx: AppContext) -> None:
+def speaker_tabs(ctx: AppContext) -> list[tuple[str, Callable[[], None]]]:
     if message := st.session_state.pop("speaker_flash", None):
         st.success(message)
     talks = list_talks(ctx.store, ctx.club_id)
-    tab_list, tab_new, tab_letters, tab_summary = st.tabs([f"講座總覽（{len(talks)}）", "新增講座", "信件與通知", "講座彙整"])
-    with tab_list:
-        overview(ctx, talks)
-    with tab_new:
-        new_talk(ctx)
-    with tab_letters:
-        letters_section(ctx, talks)
-    with tab_summary:
-        summary_section(ctx, talks)
+    return [
+        (f"講座總覽（{len(talks)}）", lambda: overview(ctx, talks)),
+        ("新增講座", lambda: new_talk(ctx)),
+        ("信件與通知", lambda: letters_section(ctx, talks)),
+        ("講座彙整", lambda: summary_section(ctx, talks)),
+    ]
 
 
 # ---------------------------------------------------------------------------

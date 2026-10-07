@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 from datetime import date, datetime, time
+from typing import Callable
 
 import pandas as pd
 import streamlit as st
@@ -57,33 +58,31 @@ def _time(text: str) -> time | None:
         return None
 
 
-def events_page(ctx: AppContext) -> None:
+def event_tabs(ctx: AppContext) -> list[tuple[str, Callable[[], None]]]:
+    """活動部門的分頁。活動選單與「新增活動」放在分頁上方，所有分頁都針對目前選擇的活動。"""
     if message := st.session_state.pop("event_flash", None):
         st.success(message)
     projects = list_projects(ctx.store, ctx.club_id)
-    with st.expander("新增活動", expanded=not projects):
+    c1, c2 = st.columns([3, 1], vertical_alignment="bottom")
+    with c2.popover("新增活動", icon=":material/add:", width="stretch"):
         new_project_form(ctx)
     if not projects:
-        return
+        c1.info("還沒有活動，按右邊「新增活動」建立第一個活動專案。")
+        return []
     ids = [p.id for p in projects]
     by_id = {p.id: p for p in projects}
     if st.session_state.get("event_project") not in ids:
         st.session_state.event_project = ids[0]
-    pid = st.selectbox("活動", ids, format_func=lambda i: f"{by_id[i].stage}｜{by_id[i].name}｜{by_id[i].when()}", key="event_project")
+    pid = c1.selectbox("活動", ids, format_func=lambda i: f"{by_id[i].stage}｜{by_id[i].name}｜{by_id[i].when()}", key="event_project")
     p = by_id[pid]
-    tabs = st.tabs(["總覽", "企劃書", "籌備清單", "細流與工作人員", "回饋表單", "成果報告"])
-    with tabs[0]:
-        overview_tab(ctx, p)
-    with tabs[1]:
-        proposal_tab(ctx, p)
-    with tabs[2]:
-        prep_tab(ctx, p)
-    with tabs[3]:
-        rundown_tab(ctx, p)
-    with tabs[4]:
-        feedback_tab(ctx, p)
-    with tabs[5]:
-        report_tab(ctx, p)
+    return [
+        ("活動總覽", lambda: overview_tab(ctx, p)),
+        ("企劃書", lambda: proposal_tab(ctx, p)),
+        ("籌備清單", lambda: prep_tab(ctx, p)),
+        ("細流與工作人員", lambda: rundown_tab(ctx, p)),
+        ("回饋表單", lambda: feedback_tab(ctx, p)),
+        ("成果報告", lambda: report_tab(ctx, p)),
+    ]
 
 
 # ---------------------------------------------------------------------------

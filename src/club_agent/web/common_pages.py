@@ -136,8 +136,11 @@ def advice_section(ctx: AppContext) -> None:
 # ---------------------------------------------------------------------------
 
 
-def add_task_form(ctx: AppContext, key: str, department: str | None = None, project: str = "", source: str = "手動新增") -> None:
-    """新增任務；department 為 None 時可選擇部門。project／source 用於活動籌備清單。"""
+def add_task_form(
+    ctx: AppContext, key: str, department: str | None = None, project: str = "", source: str = "手動新增",
+    default_department: str | None = None,
+) -> None:
+    """新增任務；department 為 None 時可選擇部門（預設 default_department）。project／source 用於活動籌備清單。"""
     with st.form(f"add_task_{key}", clear_on_submit=True):
         st.markdown("**新增任務**")
         c1, c2 = st.columns([3, 2])
@@ -145,7 +148,9 @@ def add_task_form(ctx: AppContext, key: str, department: str | None = None, proj
         owner = c2.text_input("負責人", key=f"t_owner_{key}")
         c3, c4, c5 = st.columns(3)
         if department is None:
-            dept = c3.selectbox("部門", ctx.settings.enabled_keys(), format_func=ctx.settings.name, key=f"t_dept_{key}")
+            options = ctx.settings.enabled_keys()
+            index = options.index(default_department) if default_department in options else 0
+            dept = c3.selectbox("部門", options, index=index, format_func=ctx.settings.name, key=f"t_dept_{key}")
         else:
             dept = department
         due = c4.date_input("期限（可不填）", value=None, key=f"t_due_{key}")
@@ -224,30 +229,15 @@ def tasks_table(ctx: AppContext, tasks: list[Task], key: str, show_department: b
 
 
 def tasks_page(ctx: AppContext) -> None:
-    st.subheader(f"{ctx.dept_name}的待辦與進度")
-    add_task_form(ctx, ctx.dept_key, department=ctx.dept_key)
-    show_done = st.toggle("顯示已完成", key=f"show_done_{ctx.dept_key}")
-    tasks = [t for t in list_tasks(ctx.store, ctx.club_id, ctx.dept_key) if show_done or t.status != "完成"]
-    tasks_table(ctx, tasks, ctx.dept_key, show_department=False)
-
-    with st.expander("看看其他部門在做什麼"):
-        others = [t for t in list_tasks(ctx.store, ctx.club_id) if t.department != ctx.dept_key and t.status != "完成"]
-        if others:
-            st.dataframe(
-                pd.DataFrame(
-                    {
-                        "部門": [ctx.settings.name(t.department) for t in others],
-                        "事項": [t.title for t in others],
-                        "負責人": [t.owner for t in others],
-                        "期限": [t.due for t in others],
-                        "狀態": [t.status for t in others],
-                    }
-                ),
-                hide_index=True,
-                width="stretch",
-            )
-        else:
-            st.caption("其他部門目前沒有未完成的任務。")
+    """全社團共用的待辦（側邊欄「幹部共用」）：每位幹部都可以新增、更新；預設只看自己部門。"""
+    st.caption("全社團共用的待辦清單，每位幹部都可以新增與更新進度；社長總覽會彙整各部門的進度。")
+    add_task_form(ctx, "shared", department=None, default_department=ctx.dept_key)
+    c1, c2 = st.columns([2, 1], vertical_alignment="center")
+    scope = c1.segmented_control("顯示", [f"{ctx.dept_name}", "全部部門"], default=ctx.dept_name, key=f"todo_scope_{ctx.dept_key}")
+    show_done = c2.toggle("顯示已完成", key="todo_show_done")
+    mine_only = scope != "全部部門"
+    tasks = list_tasks(ctx.store, ctx.club_id, ctx.dept_key if mine_only else None)
+    tasks_table(ctx, [t for t in tasks if show_done or t.status != "完成"], "shared", show_department=not mine_only)
 
 
 # ---------------------------------------------------------------------------
@@ -366,25 +356,24 @@ def help_page(csv_columns: list[str]) -> None:
     st.markdown(
         """
 ### 怎麼使用
-1. 在左側選擇**我的部門**。
-2. **待辦與進度**：記錄部門的任務、負責人與期限；社長可以在總覽看到全社團進度。
-3. **部門顧問**：
+1. 在左側選擇**我的部門**，上方會直接列出這個部門的功能，最後一個分頁是**部門顧問**：
    - 快速問答：直接問社團的事，例如「上次開會決定了什麼？」，AI 會從會議記錄、社團動態與待辦找答案並附出處
    - 顧問建議：描述遇到的狀況，取得行動步驟與可直接使用的文件模板
-4. **幹部共用**（左側選單）：全體幹部都會用到的功能，點選後主畫面會切換過去，按「返回部門功能」回來
-   - 社團動態：各部門分享的成果，彼此看得到；每次產生結果時可以選擇要不要分享
-   - 行事曆：排好的幹部會議、會議記錄提到的日期、待辦期限與各部門新增的行程；可以匯出到 Google 日曆
-   - 報帳申請：申請報帳並用報帳編號查詢進度；單據正本請交給財務
-5. 部分部門有專屬功能：
-   - 社長：各部門進度總覽；設定會議時間與時長，自動產生進度彙整、議程與會議時間表；追蹤上次會議還沒決議的議題
-   - 會議記錄：上傳會議記錄或 LINE 對話，自動整理重點並對照會前議程，還可以直接問問題
+2. 各部門的專屬功能：
+   - 社長：社團總覽（各部門進度、會議時間表與議程、追蹤上次會議未決議的議題）；財務管理
+   - 會議記錄：記錄問答、新增記錄（自動整理重點並對照會前議程）、所有記錄
    - 行銷：社群數據診斷、活動宣傳企劃
-   - 活動：每個活動一個專案，AI 企劃書、籌備清單（自動成為各部門待辦）、細流與工作人員表、名牌 PDF、回饋表單題目、成果報告
-   - 公關：合作對象名單與聯絡進度、AI 建議可以接洽的贊助對象類型與搜尋關鍵字、贊助邀請／追蹤／感謝／成果回報信、贊助彙整
-   - 講者：講座邀約進度、候選時間敲定（自動加入行事曆）、AI 撰寫邀請信／確認信／感謝信與社員宣傳通知、講座彙整
-   - 財務（社長也看得到）：「財務管理」以財務密碼上鎖，可審核報帳、記帳、編預算、下載月報與學期報表（Excel／Word／PDF）
-6. **社團設定**（左側選單下方）：選擇社團有哪些部門、改部門名稱、填寫部門細節、修改密碼。
-7. 所有報告都可以下載成 **Word** 或 **PDF**。
+   - 活動：先在上方選擇活動，再使用活動總覽、企劃書、籌備清單（自動成為各部門待辦）、細流與工作人員（含名牌 PDF）、回饋表單、成果報告
+   - 公關：找贊助對象（AI 建議類型與搜尋關鍵字）、合作對象、合作信件、贊助彙整
+   - 講者：講座總覽、新增講座、信件與通知、講座彙整
+   - 財務（社長也看得到）：輸入財務密碼後，有報帳審核、收支帳簿、預算、財務報表（Excel／Word／PDF）、規範與設定
+3. **幹部共用**（左側選單）：全體幹部都會用到的功能，點選後主畫面會切換過去，按「返回部門功能」回來
+   - 待辦與進度：每位幹部都可以新增、更新任務；預設只顯示自己部門，可以切換看全部
+   - 社團動態：各部門分享的成果，彼此看得到；每次產生結果時可以選擇要不要分享
+   - 行事曆：幹部會議、活動、講座、會議記錄提到的日期、待辦與追蹤期限、各部門新增的行程；可以匯出到 Google 日曆
+   - 報帳申請：申請報帳並用報帳編號查詢進度；單據正本請交給財務
+4. **社團設定**（左側選單下方）：選擇社團有哪些部門、改部門名稱、填寫部門細節、修改密碼。
+5. 所有報告都可以下載成 **Word** 或 **PDF**。
 
 ### 怎麼匯出 LINE 對話記錄
 在 LINE 聊天室右上角選單 →「設定」→「傳送聊天記錄」，存成 .txt 檔後到「會議記錄」上傳。

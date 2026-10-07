@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import date
+from typing import Callable
 
 import streamlit as st
 
@@ -161,12 +162,10 @@ def records_section(ctx: AppContext, docs: list[MeetingDoc]) -> None:
                 st.rerun()
 
 
-def meetings_page(ctx: AppContext) -> None:
+def meeting_tabs(ctx: AppContext) -> list[tuple[str, Callable[[], None]]]:
     docs = list_meetings(ctx.store, ctx.club_id)
-    tab_ask, tab_add, tab_list = st.tabs(["問問題", "新增記錄", f"所有記錄（{len(docs)}）"])
-    with tab_ask:
-        ask_section(ctx, docs)
-    with tab_add:
-        add_section(ctx)
-    with tab_list:
-        records_section(ctx, list_meetings(ctx.store, ctx.club_id))
+    return [
+        ("記錄問答", lambda: ask_section(ctx, docs)),
+        ("新增記錄", lambda: add_section(ctx)),
+        (f"所有記錄（{len(docs)}）", lambda: records_section(ctx, list_meetings(ctx.store, ctx.club_id))),
+    ]

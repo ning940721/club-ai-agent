@@ -138,6 +138,7 @@ def test_tasks_added_in_department_show_on_president_overview():
     at = _app()
     _signup(at)
     _switch(at, "pr")
+    _open(at, "tasks")  # 待辦在側邊欄「幹部共用」，部門預設為目前的部門
     _input(at, "事項").input("寄贊助邀請信")
     _input(at, "負責人").input("小明")
     next(b for b in at.button if b.label == "新增").click().run()
@@ -257,9 +258,8 @@ def test_shared_features_live_in_sidebar():
     _signup(at)
     _switch(at, "marketing")
     labels = [t.label for t in at.tabs]
-    assert labels[-1] == "部門顧問"
-    assert not {"社團動態", "行事曆", "報帳申請"} & set(labels)
-    for page, title in (("feed", "社團動態"), ("calendar", "行事曆"), ("reimburse", "報帳申請")):
+    assert labels == ["社群數據診斷", "活動宣傳企劃", "部門顧問"]
+    for page, title in (("tasks", "待辦與進度"), ("feed", "社團動態"), ("calendar", "行事曆"), ("reimburse", "報帳申請")):
         _open(at, page)
         assert title in _page_title(at)
     _switch(at, "pr")  # 換部門時回到部門功能
@@ -383,9 +383,10 @@ def test_reimbursement_request_review_and_payment():
     code = message.split("**")[1]
 
     _switch(at, "finance")
-    assert "財務管理" in [t.label for t in at.tabs]
+    assert [t.label for t in at.tabs] == ["部門顧問"]  # 解鎖前看不到財務分頁
     assert any("請先設定**財務密碼**" in i.value for i in at.info)
     _unlock_finance(at)
+    assert [t.label for t in at.tabs][:5] == ["報帳審核（1）", "收支帳簿", "預算", "財務報表", "規範與設定"]
     assert any(code in m.value and "1,500 元" in m.value for m in at.markdown)
     at.button(key=f"rv_ok_{code}").click().run()
     assert not at.exception
@@ -439,7 +440,7 @@ def test_speakers_department_flow(monkeypatch):
     at.checkbox(key="set_en_speakers").check()
     _button(at, "儲存部門設定").click().run()
     _switch(at, "speakers")
-    assert "講座管理" in [t.label for t in at.tabs]
+    assert [t.label for t in at.tabs] == ["講座總覽（0）", "新增講座", "信件與通知", "講座彙整", "部門顧問"]
     _input(at, "講者姓名＊").input("王小明")
     _input(at, "講座主題＊").input("手機街拍")
     _input(at, "聯絡方式").input("ming@example.com")
@@ -470,7 +471,7 @@ def test_event_project_flow(monkeypatch):
     at = _app()
     _signup(at)
     _switch(at, "events")
-    assert "活動專案" in [t.label for t in at.tabs]
+    assert [t.label for t in at.tabs] == ["部門顧問"]  # 還沒有活動
     _input(at, "活動名稱＊").input("期末成果展")
     _button(at, "建立活動").click().run()
     assert any("已建立「期末成果展」" in s.value for s in at.success)
@@ -509,14 +510,15 @@ def test_pr_partners_ideas_and_letters(monkeypatch):
     at = _app()
     _signup(at)
     _switch(at, "pr")
-    assert "合作與贊助" in [t.label for t in at.tabs]
+    assert [t.label for t in at.tabs][:4] == ["找贊助對象", "合作對象（0）", "合作信件", "贊助彙整"]
     _button(at, "建議贊助對象").click().run()
     assert any("學校周邊飲料店" in m.value for m in at.markdown)
 
+    # 「找贊助對象」是第一個分頁：搜尋後直接把找到的店家加入名單
     _input(at, "單位／店家名稱＊").input("好喝飲料")
     _input(at, "聯絡方式").input("drink@example.com")
-    _button(at, "加入名單").click().run()
-    assert any("已新增「好喝飲料」" in s.value for s in at.success)
+    _button(at, "加入").click().run()
+    assert any("已把「好喝飲料」加入合作對象" in s.value for s in at.success)
 
     _button(at, "產生").click().run()
     assert any(t.value == "【攝影社成果展】贊助邀請" for t in at.text_input)

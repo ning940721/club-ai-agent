@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 from datetime import date
+from typing import Callable
 
 import pandas as pd
 import streamlit as st
@@ -193,27 +194,33 @@ def unlock_gate(ctx: AppContext) -> bool:
     return False
 
 
-def finance_page(ctx: AppContext) -> None:
+def finance_tabs(ctx: AppContext) -> list[tuple[str, Callable[[], None]]]:
+    """財務分頁；還沒輸入財務密碼時，在分頁上方顯示解鎖畫面，不顯示任何財務分頁。"""
     if not unlock_gate(ctx):
-        return
+        return []
     requests = list_requests(ctx.store, ctx.club_id)
     pending = sum(r.status == PENDING for r in requests)
     c1, c2 = st.columns([5, 1])
-    c1.caption("報帳審核、收支帳簿、預算與報表。這一頁的內容不會出現在社團動態。")
+    c1.caption("財務資料只有財務與社長看得到，內容不會出現在社團動態。")
     if c2.button("鎖定", icon=":material/lock:", type="tertiary"):
         st.session_state.pop("finance_unlocked", None)
         st.rerun()
-    tabs = st.tabs([f"報帳審核（{pending}）", "收支帳簿", "預算", "報表", "規範與設定"])
-    with tabs[0]:
-        review_section(ctx, requests)
-    with tabs[1]:
-        ledger_section(ctx, requests)
-    with tabs[2]:
-        budget_section(ctx, requests)
-    with tabs[3]:
-        report_section(ctx, requests)
-    with tabs[4]:
-        settings_section(ctx)
+    return [
+        (f"報帳審核（{pending}）", lambda: review_section(ctx, requests)),
+        ("收支帳簿", lambda: ledger_section(ctx, requests)),
+        ("預算", lambda: budget_section(ctx, requests)),
+        ("財務報表", lambda: report_section(ctx, requests)),
+        ("規範與設定", lambda: settings_section(ctx)),
+    ]
+
+
+def finance_page(ctx: AppContext) -> None:
+    """社長的「財務管理」分頁：財務功能收在同一個分頁裡，不和社團總覽並列。"""
+    tabs = finance_tabs(ctx)
+    if tabs:
+        for tab, (_, render) in zip(st.tabs([name for name, _ in tabs]), tabs):
+            with tab:
+                render()
 
 
 def review_section(ctx: AppContext, requests: list[Reimbursement]) -> None:

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import os
 import sys
+from typing import Callable
 from pathlib import Path
 
 ROOT = Path(__file__).parent
@@ -31,16 +32,16 @@ from club_agent.departments import (  # noqa: E402
 )
 from club_agent.store import LocalClubStore, StoreError  # noqa: E402
 from club_agent.web.calendar_pages import calendar_page  # noqa: E402
-from club_agent.web.event_pages import events_page  # noqa: E402
-from club_agent.web.finance_pages import finance_page, reimburse_page  # noqa: E402
+from club_agent.web.event_pages import event_tabs  # noqa: E402
+from club_agent.web.finance_pages import finance_page, finance_tabs, reimburse_page  # noqa: E402
 from club_agent.web.common_pages import advisor_page, feed_page, help_page, profile_form, settings_page, tasks_page  # noqa: E402
 from club_agent.web.context import AppContext  # noqa: E402
 from club_agent.web.style import inject_css, page_header, sidebar_brand  # noqa: E402
 from club_agent.web.marketing_pages import campaign_page, diagnosis_page  # noqa: E402
-from club_agent.web.meeting_pages import meetings_page  # noqa: E402
-from club_agent.web.pr_pages import pr_page  # noqa: E402
+from club_agent.web.meeting_pages import meeting_tabs  # noqa: E402
+from club_agent.web.pr_pages import pr_tabs  # noqa: E402
 from club_agent.web.president_pages import president_page  # noqa: E402
-from club_agent.web.speaker_pages import speakers_page  # noqa: E402
+from club_agent.web.speaker_pages import speaker_tabs  # noqa: E402
 
 CSV_COLUMNS = ["date", "time", "platform", "post_type", "topic", "reach", "likes", "comments", "shares", "saves", "followers", "caption"]
 
@@ -130,6 +131,7 @@ if st.session_state.get("dept") not in enabled:
 
 # 側邊欄的頁面：幹部共用的功能，以及不常用的社團設定、使用說明。點選後主畫面改顯示該頁，選部門或按「返回」回到部門功能
 SHARED_PAGES = {
+    "tasks": ("待辦與進度", ":material/checklist:", tasks_page),
     "feed": ("社團動態", ":material/forum:", feed_page),
     "calendar": ("行事曆", ":material/calendar_month:", calendar_page),
     "reimburse": ("報帳申請", ":material/receipt_long:", reimburse_page),
@@ -190,28 +192,29 @@ page_header(ctx.dept_name, club.name, beta=DEPARTMENTS[dept_key].beta)
 if not API_KEY:
     st.error("網站尚未設定 GEMINI_API_KEY，請管理者到 Secrets 設定（見 docs/deploy.md）。")
 
-pages: list[tuple[str, callable]] = []
+# 各部門的功能直接列在上方分頁；部門顧問放最後。待辦、社團動態、行事曆、報帳在側邊欄「幹部共用」。
+# 有些部門的功能需要先在分頁上方選擇對象（例如活動），所以先取得分頁清單（會先畫出上方的選單），再建立分頁。
+pages: list[tuple[str, Callable[[], None]]] = []
 if FEATURE_PRESIDENT in features:
-    pages.append(("社團總覽", president_page))
+    pages.append(("社團總覽", lambda: president_page(ctx)))
+    if FEATURE_FINANCE in features:
+        pages.append(("財務管理", lambda: finance_page(ctx)))  # 社長的財務功能收在一個分頁裡
+elif FEATURE_FINANCE in features:
+    pages += finance_tabs(ctx)
 if FEATURE_MEETINGS in features:
-    pages.append(("會議記錄", meetings_page))
+    pages += meeting_tabs(ctx)
 if FEATURE_MARKETING in features:
-    pages += [("社群數據診斷", diagnosis_page), ("活動宣傳企劃", campaign_page)]
+    pages += [("社群數據診斷", lambda: diagnosis_page(ctx)), ("活動宣傳企劃", lambda: campaign_page(ctx))]
 if FEATURE_EVENTS in features:
-    pages.append(("活動專案", events_page))
+    pages += event_tabs(ctx)
 if FEATURE_PR in features:
-    pages.append(("合作與贊助", pr_page))
-if FEATURE_FINANCE in features:
-    pages.append(("財務管理", finance_page))
+    pages += pr_tabs(ctx)
 if FEATURE_SPEAKERS in features:
-    pages.append(("講座管理", speakers_page))
-if FEATURE_PRESIDENT not in features:
-    pages.append(("待辦與進度", tasks_page))
-
-pages.append(("部門顧問", advisor_page))
+    pages += speaker_tabs(ctx)
+pages.append(("部門顧問", lambda: advisor_page(ctx)))
 
 for tab, (_, render) in zip(st.tabs([name for name, _ in pages]), pages):
     with tab:
-        render(ctx)
+        render()
 
 usage_slot.caption(f"本次已使用 {st.session_state.get('runs', 0)} / {ctx.max_runs} 次")

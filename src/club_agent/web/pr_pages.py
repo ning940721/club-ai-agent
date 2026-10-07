@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import date
+from typing import Callable
 from urllib.parse import quote_plus
 
 import streamlit as st
@@ -38,21 +39,22 @@ def _flash(message: str) -> None:
     st.rerun()
 
 
-def pr_page(ctx: AppContext) -> None:
+def pr_tabs(ctx: AppContext) -> list[tuple[str, Callable[[], None]]]:
     if message := st.session_state.pop("pr_flash", None):
         st.success(message)
     partners = list_partners(ctx.store, ctx.club_id)
-    tabs = st.tabs([f"合作對象（{len(partners)}）", "找贊助對象", "信件", "贊助彙整"])
-    with tabs[0]:
-        partners_tab(ctx, partners)
-    with tabs[1]:
-        ideas_tab(ctx, partners)
-    with tabs[2]:
-        letters_tab(ctx, partners)
-    with tabs[3]:
+
+    def summary() -> None:
         md = sponsorship_markdown(ctx.club.name, partners)
         st.markdown(md)
         download_buttons(md, "贊助與合作彙整", "sponsorship")
+
+    return [
+        ("找贊助對象", lambda: ideas_tab(ctx, partners)),
+        (f"合作對象（{len(partners)}）", lambda: partners_tab(ctx, partners)),
+        ("合作信件", lambda: letters_tab(ctx, partners)),
+        ("贊助彙整", summary),
+    ]
 
 
 def _event_names(ctx: AppContext) -> list[str]:
