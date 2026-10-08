@@ -6,6 +6,7 @@ from .drafting import DraftingAgent
 from .events import EventPlanner
 from .finance import FinanceAnalyst
 from .letters import LetterWriter
+from .marketing_monthly import MonthlyReviewer
 from .partners import SponsorAdvisor
 from .president import ProgressReporter
 from .secretary import MeetingQA, MeetingSummarizer
@@ -21,6 +22,7 @@ __all__ = [
     "LetterWriter",
     "MeetingQA",
     "MeetingSummarizer",
+    "MonthlyReviewer",
     "ProgressReporter",
     "SponsorAdvisor",
     "club_retriever",

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .schemas import Advice, CampaignResult, DiagnosisReport, MeetingAnswer, MeetingSummary, ProgressBrief
+from .schemas import Advice, CampaignResult, DiagnosisReport, MarketingMonthlyReview, MeetingAnswer, MeetingSummary, ProgressBrief
 
 
 def _cell(text: object) -> str:
@@ -148,4 +148,23 @@ def progress_brief_markdown(club_name: str, today: str, b: ProgressBrief, agenda
         out += ["", "## 需要決定的事", *[f"- {x}" for x in b.decisions_needed]]
     if b.reminders:
         out += ["", "## 近期提醒", *[f"- {x}" for x in b.reminders]]
+    return "\n".join(out) + "\n"
+
+
+def monthly_report_markdown(club_name: str, month: str, rows: list[tuple[str, str, str, str]], r: MarketingMonthlyReview) -> str:
+    """rows：post_history.MonthComparison.rows() 的 (指標, 本月, 上月, 變化)。"""
+    out = [f"# {club_name} 社群月報（{month}）", "", "## 本月總結", r.summary, "",
+           "## 和上月比較", "| 指標 | 本月 | 上月 | 變化 |", "|---|---|---|---|"]
+    out += [f"| {name} | {now} | {prev} | {diff} |" for name, now, prev, diff in rows]
+    if r.wins:
+        out += ["", "## 做得好的地方", *[f"- {x}" for x in r.wins]]
+    if r.issues:
+        out += ["", "## 需要改善", *[f"- {x}" for x in r.issues]]
+    if r.next_month_plan:
+        out += ["", "## 下個月內容規劃", "| 主題 | 形式 | 發文時間 | 目的 |", "|---|---|---|---|"]
+        out += [f"| {_cell(p.topic)} | {_cell(p.format)} | {_cell(p.timing)} | {_cell(p.purpose)} |" for p in r.next_month_plan]
+    if r.kpi_targets:
+        out += ["", "## 下個月目標", *[f"- {x}" for x in r.kpi_targets]]
+    if r.data_to_collect:
+        out += ["", "## 下個月請補記的資料", *[f"- {x}" for x in r.data_to_collect]]
     return "\n".join(out) + "\n"

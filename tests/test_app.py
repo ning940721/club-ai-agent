@@ -258,7 +258,7 @@ def test_shared_features_live_in_sidebar():
     _signup(at)
     _switch(at, "marketing")
     labels = [t.label for t in at.tabs]
-    assert labels == ["社群數據診斷", "活動宣傳企劃", "部門顧問"]
+    assert labels == ["社群數據診斷", "月報與趨勢", "活動宣傳企劃", "部門顧問"]
     for page, title in (("tasks", "待辦與進度"), ("feed", "AI Agent 問答"), ("calendar", "行事曆"), ("reimburse", "報帳申請")):
         _open(at, page)
         assert title in _page_title(at)
@@ -526,3 +526,26 @@ def test_ai_agent_page_answers_from_search_box():
     _button(at, "提問").click().run()
     assert any("**Q：成果展在哪裡辦？**" in m.value for m in at.markdown)
     assert any(h.value == "各部門分享的成果" for h in at.subheader)
+
+
+def test_marketing_history_and_monthly_report(monkeypatch):
+    from club_agent.schemas import ContentPlanItem, MarketingMonthlyReview
+
+    review = MarketingMonthlyReview(summary="本月互動率提升", wins=["Reels 表現好"], issues=["貼文數少"],
+                                    next_month_plan=[ContentPlanItem(topic="作品分享", format="輪播", timing="週日晚上", purpose="互動")],
+                                    kpi_targets=["互動率 7%"], data_to_collect=[])
+    original = GeminiLLM.structured
+    monkeypatch.setattr(GeminiLLM, "structured", lambda self, system, user, output_type: (
+        review if output_type is MarketingMonthlyReview else original(self, system, user, output_type)))
+    at = _app()
+    _signup(at)
+    _switch(at, "marketing")
+    assert any("還沒有歷史資料" in i.value for i in at.info)
+    at.button(key="save_history").click().run()  # 範例數據存入歷史
+    assert any("已存入：新增 36 篇" in s.value for s in at.success)
+    at.button(key="save_history").click().run()  # 重複上傳不會重複計算
+    assert any("新增 0 篇" in s.value for s in at.success)
+    assert at.selectbox(key="monthly_month").value == "2026-06"
+    _button(at, "產生 AI 月報").click().run()
+    assert not at.exception
+    assert any("本月互動率提升" in m.value for m in at.markdown)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
 
 import pandas as pd
@@ -18,7 +19,10 @@ from ..metrics import (
     rows_to_posts,
     summarize,
 )
-from ..report import campaign_markdown, diagnosis_markdown
+from ..agents import MonthlyReviewer
+from ..events import club_events, events_digest
+from ..post_history import clear_history, compare_month, list_history, months, save_posts
+from ..report import campaign_markdown, diagnosis_markdown, monthly_report_markdown
 from ..retriever import BM25Retriever
 from ..workflow import MarketingWorkflow
 from .context import AppContext, download_buttons
@@ -101,6 +105,9 @@ def diagnosis_page(ctx: AppContext) -> None:
         with st.expander("查看數據與統計摘要"):
             st.dataframe(df, width="stretch", hide_index=True)
             st.text(metrics.to_prompt_text())
+        if st.button("存到歷史資料（月報與趨勢會用到）", icon=":material/history:", key="save_history"):
+            added, updated = save_posts(ctx.store, ctx.club_id, posts)
+            st.success(f"已存入：新增 {added} 篇、更新 {updated} 篇。到「月報與趨勢」查看各月比較。")
 
         concern = st.text_area("目前的宣傳困擾（選填）", placeholder="例：最近三個月觸及一直掉，不知道該發什麼")
         col_btn, col_share = st.columns([1, 3], vertical_alignment="center")
@@ -124,6 +131,84 @@ def diagnosis_page(ctx: AppContext) -> None:
         st.markdown(st.session_state.diagnosis_md)
         download_buttons(st.session_state.diagnosis_md, "社群數據診斷報告", "diagnosis")
         ctx.share_controls("diagnosis")
+
+
+def monthly_page(ctx: AppContext) -> None:
+    """月報與趨勢：歷史資料的各月比較、趨勢圖與 AI 月報。"""
+    history = list_history(ctx.store, ctx.club_id)
+    if not history:
+        st.info("還沒有歷史資料。到「社群數據診斷」上傳貼文數據後，按「存到歷史資料」。之後每個月上傳一次最新的匯出檔，系統會自動合併。")
+        return
+    available = months(history)
+    st.caption(f"歷史資料：{len(history)} 篇貼文（{available[-1]} ~ {available[0]}）。每個月上傳一次最新的匯出檔，重複的貼文會自動合併。")
+
+    trend = summarize(history).by_month
+    if len(trend) >= 2:
+        st.markdown("**歷月趨勢**")
+        chart = pd.DataFrame({
+            "月份": [m.key for m in trend],
+            "平均觸及": [m.avg_reach for m in trend],
+            "平均互動率（%）": [None if m.avg_engagement_rate is None else round(m.avg_engagement_rate * 100, 2) for m in trend],
+        }).set_index("月份")
+        # 觸及與互動率單位不同，分成兩張圖，不用雙軸
+        c1, c2 = st.columns(2)
+        with c1:
+            st.caption("平均觸及（人）")
+            st.line_chart(chart["平均觸及"], color="#2D4A6B", height=220)
+        with c2:
+            st.caption("平均互動率（%）")
+            st.line_chart(chart["平均互動率（%）"], color="#2D4A6B", height=220)
+        with st.expander("查看各月數字"):
+            st.dataframe(
+                pd.DataFrame({
+                    "月份": [m.key for m in trend], "貼文數": [m.posts for m in trend],
+                    "平均觸及": ["—" if m.avg_reach is None else f"{m.avg_reach:,.0f}" for m in trend],
+                    "平均互動率": ["—" if m.avg_engagement_rate is None else f"{m.avg_engagement_rate:.2%}" for m in trend],
+                }),
+                hide_index=True, width="stretch",
+            )
+
+    st.divider()
+    month = st.selectbox("月報月份", available, key="monthly_month")
+    comparison = compare_month(history, month)
+    st.markdown(f"**{month} 和 {comparison.previous} 比較**")
+    st.dataframe(pd.DataFrame(comparison.rows(), columns=["指標", "本月", "上月", "變化"]), hide_index=True, width="stretch")
+    if comparison.current.top_posts:
+        st.markdown("**本月互動率最高的貼文**\n" + "\n".join(f"- {t}" for t in comparison.current.top_posts))
+    gaps = [c for c in comparison.current.coverage if c.missing]
+    if gaps:
+        st.caption("本月資料完整度：" + "；".join(f"{c.label} {c.filled}/{c.total}" for c in gaps))
+
+    concern = st.text_input("這個月想特別了解什麼（選填）", placeholder="例：Reels 是不是比輪播好？", key="monthly_concern")
+    col_btn, col_share = st.columns([1, 3], vertical_alignment="center")
+    clicked = col_btn.button("產生 AI 月報", type="primary", key="monthly_go")
+    with col_share:
+        share = ctx.share_toggle("monthly")
+    if clicked:
+        trend_text = "\n".join(f"- {m.line()}" for m in trend)
+        today = date.today()
+        upcoming = events_digest(club_events(ctx.store, ctx.club_id, ctx.settings), today, past_days=0, future_days=45,
+                                 settings=ctx.settings)
+        review = ctx.run_ai(
+            "撰寫社群月報中…",
+            lambda llm, _s: MonthlyReviewer(llm).run(ctx.club, comparison.to_prompt_text(), trend_text, upcoming, concern),
+        )
+        if review:
+            md = monthly_report_markdown(ctx.club.name, month, comparison.rows(), review)
+            st.session_state.monthly_md = (month, md)
+            ctx.keep_result("monthly", "monthly", f"社群月報（{month}）", review.summary[:150], md, share, "marketing")
+    if (saved := st.session_state.get("monthly_md")) and saved[0] == month:
+        st.divider()
+        st.markdown(saved[1])
+        download_buttons(saved[1], f"社群月報_{month}", f"monthly_{month}")
+        ctx.share_controls("monthly")
+
+    with st.expander("清除歷史資料"):
+        st.caption("會刪除所有存過的貼文數據（不影響已產生的報告）。")
+        if st.button("確定清除", key="clear_history"):
+            clear_history(ctx.store, ctx.club_id)
+            st.session_state.pop("monthly_md", None)
+            st.rerun()
 
 
 def campaign_page(ctx: AppContext) -> None:

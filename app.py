@@ -37,7 +37,7 @@ from club_agent.web.finance_pages import finance_page, finance_tabs, reimburse_p
 from club_agent.web.common_pages import advisor_page, feed_page, help_page, profile_form, settings_page, tasks_page  # noqa: E402
 from club_agent.web.context import AppContext  # noqa: E402
 from club_agent.web.style import inject_css, page_header, sidebar_brand  # noqa: E402
-from club_agent.web.marketing_pages import campaign_page, diagnosis_page  # noqa: E402
+from club_agent.web.marketing_pages import campaign_page, diagnosis_page, monthly_page  # noqa: E402
 from club_agent.web.meeting_pages import meeting_tabs  # noqa: E402
 from club_agent.web.pr_pages import pr_tabs  # noqa: E402
 from club_agent.web.president_pages import president_page  # noqa: E402
@@ -203,7 +203,8 @@ elif FEATURE_FINANCE in features:
 if FEATURE_MEETINGS in features:
     pages += meeting_tabs(ctx)
 if FEATURE_MARKETING in features:
-    pages += [("社群數據診斷", lambda: diagnosis_page(ctx)), ("活動宣傳企劃", lambda: campaign_page(ctx))]
+    pages += [("社群數據診斷", lambda: diagnosis_page(ctx)), ("月報與趨勢", lambda: monthly_page(ctx)),
+              ("活動宣傳企劃", lambda: campaign_page(ctx))]
 if FEATURE_EVENTS in features:
     pages += event_tabs(ctx)
 if FEATURE_PR in features:

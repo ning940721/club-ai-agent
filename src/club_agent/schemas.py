@@ -378,3 +378,24 @@ class SponsorIdea(BaseModel):
 class SponsorIdeas(BaseModel):
     ideas: list[SponsorIdea] = Field(description="5–8 個建議，依成功機率由高到低")
     tips: list[str] = Field(description="這次接洽的注意事項（3–5 點）")
+
+
+# ---------------------------------------------------------------------------
+# 行銷月報
+# ---------------------------------------------------------------------------
+
+
+class ContentPlanItem(BaseModel):
+    topic: str = Field(description="貼文主題")
+    format: str = Field(description="貼文形式，例如：輪播、Reels")
+    timing: str = Field(description="建議發文時間；資料沒有發文時間時寫「先記錄發文時間，下月再判斷」")
+    purpose: str = Field(description="這篇要達成什麼")
+
+
+class MarketingMonthlyReview(BaseModel):
+    summary: str = Field(description="本月社群表現總結（3–4 句），引用和上月比較的數字")
+    wins: list[str] = Field(description="做得好的地方，附數字證據")
+    issues: list[str] = Field(description="需要改善的地方，附數字證據")
+    next_month_plan: list[ContentPlanItem] = Field(description="下個月的內容規劃，4–8 篇")
+    kpi_targets: list[str] = Field(description="下個月的目標，具體可衡量，例如：平均互動率由 5.2% 提升到 6%")
+    data_to_collect: list[str] = Field(description="下個月應該補記的資料（依資料完整度）；資料完整時為空")
