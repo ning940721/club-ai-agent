@@ -1,4 +1,7 @@
-"""行銷部門專屬功能：社群數據診斷、活動宣傳企劃。"""
+"""行銷部門專屬功能：社群數據診斷、月報與趨勢。
+
+活動宣傳企劃（MarketingWorkflow.campaign）暫時從網頁拿掉，命令列（club-agent campaign）仍可使用。
+"""
 
 from __future__ import annotations
 
@@ -22,7 +25,7 @@ from ..metrics import (
 from ..agents import MonthlyReviewer
 from ..events import club_events, events_digest
 from ..post_history import clear_history, compare_month, list_history, months, save_posts
-from ..report import campaign_markdown, diagnosis_markdown, monthly_report_markdown
+from ..report import diagnosis_markdown, monthly_report_markdown
 from ..retriever import BM25Retriever
 from ..workflow import MarketingWorkflow
 from .context import AppContext, download_buttons
@@ -209,48 +212,3 @@ def monthly_page(ctx: AppContext) -> None:
             clear_history(ctx.store, ctx.club_id)
             st.session_state.pop("monthly_md", None)
             st.rerun()
-
-
-def campaign_page(ctx: AppContext) -> None:
-    st.subheader("輸入活動資訊，產出多平台宣傳企劃")
-    st.caption("不知道的欄位可以留空，AI 會標示【待補】，不會自己編造。")
-    c1, c2 = st.columns(2)
-    event_name = c1.text_input("活動名稱＊", placeholder="例：跨校社團聯展")
-    event_date = c2.text_input("活動日期與時間", placeholder="例：12/20（六）13:00-18:00")
-    location = c1.text_input("地點", placeholder="例：學生活動中心 2 樓")
-    fee = c2.text_input("費用", placeholder="例：免費入場")
-    goal = c1.text_input("宣傳目標", placeholder="例：吸引 300 人參觀、IG 新增 100 位追蹤")
-    signup = c2.text_input("報名方式", placeholder="例：IG 主頁連結的 Google 表單")
-    extra = st.text_area("其他說明", placeholder="例：有 5 個攝影社團共同參展、現場有底片體驗攤位")
-
-    has_diag = st.session_state.get("diagnosis") is not None
-    use_diag = st.checkbox("參考「社群數據診斷」的結果", value=has_diag, disabled=not has_diag)
-    rounds = st.slider("最多審查修訂輪數", 1, 3, 1, help="每多一輪就多呼叫 AI 兩次。輪數越多品質可能越好，但等待時間與用量也會增加")
-
-    col_btn, col_share = st.columns([1, 3], vertical_alignment="center")
-    clicked = col_btn.button("產生宣傳企劃", type="primary")
-    with col_share:
-        share = ctx.share_toggle("campaign")
-    if clicked:
-        if not event_name.strip():
-            st.warning("請先填寫活動名稱")
-        else:
-            fields = [("活動名稱", event_name), ("日期時間", event_date), ("地點", location), ("費用", fee),
-                      ("報名方式", signup), ("宣傳目標", goal), ("其他說明", extra)]
-            brief = "\n".join(f"{k}：{v.strip() or '【未提供】'}" for k, v in fields)
-            diagnosis = st.session_state.diagnosis if use_diag else None
-            result = ctx.run_ai(
-                "AI 顧問撰寫中（約需 1–3 分鐘）…",
-                lambda llm, status: _workflow(llm, status, rounds).campaign(ctx.club, brief, diagnosis),
-                "企劃完成",
-            )
-            if result:
-                md = campaign_markdown(result)
-                st.session_state.campaign_md = md
-                ctx.keep_result("campaign", "campaign", event_name.strip(), result.plan.key_message[:150], md, share)
-
-    if st.session_state.get("campaign_md"):
-        st.divider()
-        st.markdown(st.session_state.campaign_md)
-        download_buttons(st.session_state.campaign_md, "活動宣傳企劃", "campaign")
-        ctx.share_controls("campaign")

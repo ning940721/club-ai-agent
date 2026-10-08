@@ -9,7 +9,7 @@ import streamlit as st
 
 from ..agents import ClubQA, DepartmentAdvisor, club_retriever
 from ..events import club_events, events_digest
-from ..departments import DEPARTMENTS, ClubSettings, DepartmentConfig, department_retriever
+from ..departments import CUSTOM_PREFIX, DEPARTMENTS, FEATURES, ClubSettings, DepartmentConfig, department_retriever
 from ..meetings import list_meetings
 from ..report import advice_markdown, meeting_answer_markdown
 from ..schemas import ClubProfile
@@ -296,16 +296,58 @@ def profile_form(prefix: str, profile: ClubProfile | None = None) -> ClubProfile
     )
 
 
-def department_settings_form(settings: ClubSettings) -> ClubSettings:
-    st.caption("勾選社團有的部門；展開可以改部門名稱，並填寫部門細節（AI 會依細節調整建議）。")
+def _feature_label(f: str) -> str:
+    return FEATURES[f][0]
+
+
+def department_settings_form(settings: ClubSettings, prefix: str = "set") -> ClubSettings:
+    """部門與分工：勾選社團有的部門、決定每個部門負責哪些功能，並可新增系統沒有的自訂部門。"""
+    st.caption("勾選社團有的部門。每個社團的分工不同，展開部門可以改名稱、調整「負責的功能」並填寫部門細節（AI 會依細節調整建議）。"
+               "例如公關也負責邀請講者，就把「講座管理」加到公關。")
+    with st.popover("各功能模組在做什麼"):
+        st.markdown("\n".join(f"- **{label}**：{desc}" for label, desc in FEATURES.values()))
+    feature_keys = list(FEATURES)
     configs = {}
     for key, d in DEPARTMENTS.items():
         cfg = settings.config(key)
-        enabled = st.checkbox(d.label, value=cfg.enabled, key=f"set_en_{key}", help="、".join(d.focus))
-        with st.expander(f"{settings.name(key)}：名稱與細節"):
-            name = st.text_input("部門名稱（空白則使用預設）", value=cfg.display_name, placeholder=d.name, key=f"set_name_{key}")
-            details = st.text_area("部門細節", value=cfg.details, placeholder=d.details_hint, key=f"set_details_{key}")
-        configs[key] = DepartmentConfig(enabled=enabled, display_name=name.strip(), details=details.strip())
+        current = list(settings.features(key))
+        summary = f"（{'、'.join(_feature_label(f) for f in current)}）" if current else ""
+        enabled = st.checkbox(f"{settings.name(key)}{summary}", value=cfg.enabled, key=f"{prefix}_en_{key}", help="、".join(d.focus))
+        with st.expander(f"{settings.name(key)}：名稱、分工與細節"):
+            name = st.text_input("部門名稱（空白則使用預設）", value=cfg.display_name, placeholder=d.name, key=f"{prefix}_name_{key}")
+            features = st.multiselect("負責的功能", feature_keys, default=current, format_func=_feature_label,
+                                      key=f"{prefix}_feat_{key}", placeholder="沒有專屬功能（只有部門顧問）")
+            details = st.text_area("部門細節", value=cfg.details, placeholder=d.details_hint, key=f"{prefix}_details_{key}")
+        configs[key] = DepartmentConfig(
+            enabled=enabled, display_name=name.strip(), details=details.strip(),
+            features=None if features == list(d.features) else features,  # 和預設相同時不另外存，之後預設更新也會跟著更新
+        )
+
+    st.markdown("**自訂部門**（系統沒有的部門，例如學術部、外務部）")
+    custom_list = f"{prefix}_custom_keys"
+    if custom_list not in st.session_state:
+        st.session_state[custom_list] = [k for k in settings.custom_keys() if settings.config(k).enabled]
+    for key in settings.custom_keys():  # 刪除過的自訂部門保留設定（停用），舊紀錄仍能顯示部門名稱
+        if key not in st.session_state[custom_list]:
+            configs[key] = settings.config(key).model_copy(update={"enabled": False})
+    for key in list(st.session_state[custom_list]):
+        cfg = settings.config(key) if key in settings.departments else DepartmentConfig(enabled=True, custom=True)
+        with st.container(border=True):
+            c1, c2, c3 = st.columns([2, 4, 1], vertical_alignment="bottom")
+            name = c1.text_input("部門名稱", value=cfg.display_name, key=f"{prefix}_cname_{key}", placeholder="例：學術部")
+            features = c2.multiselect("負責的功能", feature_keys, default=cfg.features or [], format_func=_feature_label,
+                                      key=f"{prefix}_cfeat_{key}", placeholder="沒有專屬功能（只有部門顧問）")
+            remove = c3.checkbox("刪除", key=f"{prefix}_cdel_{key}")
+            details = st.text_input("部門細節（選填）", value=cfg.details, key=f"{prefix}_cdet_{key}",
+                                    placeholder="例：負責每學期的讀書會與學術講座")
+        if name.strip():
+            configs[key] = DepartmentConfig(enabled=not remove, display_name=name.strip(), details=details.strip(),
+                                            features=features, custom=True)
+    if st.button("新增自訂部門", icon=":material/add:", key=f"{prefix}_add_custom"):
+        import uuid
+
+        st.session_state[custom_list].append(f"{CUSTOM_PREFIX}{uuid.uuid4().hex[:6]}")
+        st.rerun()
     return settings.model_copy(update={"departments": configs})
 
 
@@ -326,6 +368,7 @@ def settings_page(ctx: AppContext) -> None:
         if st.button("儲存部門設定", type="primary"):
             try:
                 ctx.store.update_settings(ctx.club_id, new_settings)
+                st.session_state.pop("set_custom_keys", None)
                 st.success("已儲存")
                 st.rerun()
             except StoreError as e:
@@ -360,7 +403,7 @@ def help_page() -> None:
 2. 各部門的專屬功能：
    - 社長：社團總覽（各部門進度、會議時間表與議程、追蹤上次會議未決議的議題）；財務管理
    - 會議記錄：記錄問答、新增記錄（自動整理重點並對照會前議程）、所有記錄
-   - 行銷：社群數據診斷、活動宣傳企劃
+   - 行銷：社群數據診斷、月報與趨勢
    - 活動：先在上方選擇活動，再使用活動總覽、企劃書、籌備清單（自動成為各部門待辦）、細流與工作人員（含名牌 PDF）、回饋表單、成果報告
    - 公關：找贊助對象（AI 建議類型與搜尋關鍵字）、合作對象、合作信件、贊助彙整
    - 講者：講座總覽、新增講座、信件與通知、講座彙整
@@ -370,7 +413,7 @@ def help_page() -> None:
    - AI Agent 問答：上方可以直接提問（例：下次發文時間是什麼時候？），AI 會從各部門分享的成果、會議記錄、待辦與行事曆找答案；下方列出各部門分享的成果，產生結果時可以選擇要不要分享
    - 行事曆：幹部會議、活動、講座、會議記錄提到的日期、待辦與追蹤期限、各部門新增的行程；可以匯出到 Google 日曆
    - 報帳申請：申請報帳並用報帳編號查詢進度；單據正本請交給財務
-4. **社團設定**（左側選單下方）：選擇社團有哪些部門、改部門名稱、填寫部門細節、修改密碼。
+4. **社團設定**（左側選單下方）：選擇社團有哪些部門、**每個部門負責哪些功能**（例如公關兼講者）、新增系統沒有的自訂部門、改名稱、填寫部門細節、修改密碼。
 5. 所有報告都可以下載成 **Word** 或 **PDF**。
 
 ### 怎麼匯出 LINE 對話記錄

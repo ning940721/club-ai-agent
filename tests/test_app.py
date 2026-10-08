@@ -236,13 +236,8 @@ def test_marketing_tools_flow():
     _button(at, "開始診斷").click().run()
     assert not at.exception
     assert any("流量瓶頸" in m.value for m in at.markdown)
-    _button(at, "產生宣傳企劃").click().run()
-    assert any("請先填寫活動名稱" in w.value for w in at.warning)
-    _input(at, "活動名稱＊").input("跨校社團聯展")
-    _button(at, "產生宣傳企劃").click().run()
-    assert not at.exception
-    assert any("網頁測試企劃" in m.value for m in at.markdown)
-    assert "2 / 20" in " ".join(c.value for c in at.caption)
+    assert "1 / 20" in " ".join(c.value for c in at.caption)
+    assert "產生宣傳企劃" not in [b.label for b in at.button]  # 活動宣傳企劃已從網頁拿掉
 
 
 def test_signup_code_required(monkeypatch):
@@ -258,7 +253,7 @@ def test_shared_features_live_in_sidebar():
     _signup(at)
     _switch(at, "marketing")
     labels = [t.label for t in at.tabs]
-    assert labels == ["社群數據診斷", "月報與趨勢", "活動宣傳企劃", "部門顧問"]
+    assert labels == ["社群數據診斷", "月報與趨勢", "部門顧問"]
     for page, title in (("tasks", "待辦與進度"), ("feed", "AI Agent 問答"), ("calendar", "行事曆"), ("reimburse", "報帳申請")):
         _open(at, page)
         assert title in _page_title(at)
@@ -549,3 +544,23 @@ def test_marketing_history_and_monthly_report(monkeypatch):
     _button(at, "產生 AI 月報").click().run()
     assert not at.exception
     assert any("本月互動率提升" in m.value for m in at.markdown)
+
+
+def test_settings_reassign_features_and_add_custom_department():
+    at = _app()
+    _signup(at)
+    _open(at, "settings")
+    at.multiselect(key="set_feat_pr").select("speaker_tools").run()  # 公關兼講者
+    _button(at, "新增自訂部門").click().run()
+    custom = next(w for w in at.text_input if w.key and w.key.startswith("set_cname_"))
+    custom.input("學術部")
+    key = custom.key.removeprefix("set_cname_")
+    at.multiselect(key=f"set_cfeat_{key}").select("event_projects").run()
+    _button(at, "儲存部門設定").click().run()
+    assert not at.exception
+    assert "學術部" in at.selectbox(key="dept").options
+    _switch(at, "pr")
+    labels = [t.label for t in at.tabs]
+    assert "找贊助對象" in labels and "講座總覽（0）" in labels
+    _switch(at, key)
+    assert "學術部" in _page_title(at) and [t.label for t in at.tabs] == ["部門顧問"]  # 還沒有活動時只有選單與部門顧問

@@ -11,7 +11,7 @@ from typing import Any, Callable
 import streamlit as st
 from streamlit.runtime.scriptrunner import add_script_run_ctx, get_script_run_ctx
 
-from ..departments import ClubSettings, Department, get_department
+from ..departments import ClubSettings, Department
 from ..export import pdf_available, to_docx, to_pdf
 from ..llm import GeminiLLM, LLMError
 from ..schemas import ClubProfile
@@ -60,7 +60,7 @@ class AppContext:
 
     @property
     def dept(self) -> Department:
-        return get_department(self.dept_key)
+        return self.settings.department(self.dept_key)
 
     @property
     def dept_name(self) -> str:

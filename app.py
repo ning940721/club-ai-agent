@@ -19,8 +19,6 @@ sys.path.insert(0, str(ROOT / "src"))
 import streamlit as st  # noqa: E402
 
 from club_agent.departments import (  # noqa: E402
-    DEFAULT_ENABLED,
-    DEPARTMENTS,
     FEATURE_EVENTS,
     FEATURE_FINANCE,
     FEATURE_MARKETING,
@@ -34,10 +32,18 @@ from club_agent.store import LocalClubStore, StoreError  # noqa: E402
 from club_agent.web.calendar_pages import calendar_page  # noqa: E402
 from club_agent.web.event_pages import event_tabs  # noqa: E402
 from club_agent.web.finance_pages import finance_page, finance_tabs, reimburse_page  # noqa: E402
-from club_agent.web.common_pages import advisor_page, feed_page, help_page, profile_form, settings_page, tasks_page  # noqa: E402
+from club_agent.web.common_pages import (  # noqa: E402
+    advisor_page,
+    department_settings_form,
+    feed_page,
+    help_page,
+    profile_form,
+    settings_page,
+    tasks_page,
+)
 from club_agent.web.context import AppContext  # noqa: E402
 from club_agent.web.style import inject_css, page_header, sidebar_brand  # noqa: E402
-from club_agent.web.marketing_pages import campaign_page, diagnosis_page, monthly_page  # noqa: E402
+from club_agent.web.marketing_pages import diagnosis_page, monthly_page  # noqa: E402
 from club_agent.web.meeting_pages import meeting_tabs  # noqa: E402
 from club_agent.web.pr_pages import pr_tabs  # noqa: E402
 from club_agent.web.president_pages import president_page  # noqa: E402
@@ -89,14 +95,8 @@ if "club_id" not in st.session_state:
             new_account = st.text_input("設定社團帳號（英文或數字，例：ntu-photo）", key="su_account")
             new_pw = st.text_input("設定密碼（至少 6 個字元）", type="password", key="su_pw")
             new_pw2 = st.text_input("再輸入一次密碼", type="password", key="su_pw2")
-            st.markdown("**社團有哪些部門？**（之後可在「社團設定」修改、改名、填寫部門細節）")
-            chosen_depts = st.multiselect(
-                "部門",
-                list(DEPARTMENTS),
-                default=list(DEFAULT_ENABLED),
-                format_func=lambda k: DEPARTMENTS[k].label,
-                key="su_depts",
-            )
+            st.markdown("**社團有哪些部門、各自負責什麼？**（之後可在「社團設定」修改）")
+            club_settings = department_settings_form(ClubSettings.default(), prefix="su")
             st.markdown("**社團資料**（AI 會依這些資料給出貼合社團的建議）")
             profile = profile_form("su")
             if st.button("建立帳號並登入", type="primary"):
@@ -104,13 +104,13 @@ if "club_id" not in st.session_state:
                     st.error("邀請碼錯誤")
                 elif new_pw != new_pw2:
                     st.error("兩次輸入的密碼不一樣")
-                elif not chosen_depts:
+                elif not club_settings.enabled_keys():
                     st.error("請至少選擇一個部門")
                 elif profile is None:
                     st.error("請填寫社團名稱、定位與目標受眾")
                 else:
                     try:
-                        st.session_state.club_id = store.create_club(new_account, new_pw, profile, ClubSettings.default(chosen_depts))
+                        st.session_state.club_id = store.create_club(new_account, new_pw, profile, club_settings)
                         st.rerun()
                     except StoreError as e:
                         st.error(str(e))
@@ -177,7 +177,7 @@ ctx = AppContext(
     max_runs=int(secret("MAX_RUNS_PER_SESSION", "20")),
     thinking=secret("GEMINI_THINKING"),
 )
-features = DEPARTMENTS[dept_key].features
+features = settings.features(dept_key)  # 社團自訂的分工
 
 if (side_page := st.session_state.get("side_page")) in SIDE_PAGES:
     label, _, render = SIDE_PAGES[side_page]
@@ -187,30 +187,27 @@ if (side_page := st.session_state.get("side_page")) in SIDE_PAGES:
     usage_slot.caption(f"本次已使用 {st.session_state.get('runs', 0)} / {ctx.max_runs} 次")
     st.stop()
 
-page_header(ctx.dept_name, club.name, beta=DEPARTMENTS[dept_key].beta)
+page_header(ctx.dept_name, club.name, beta=ctx.dept.beta)
 if not API_KEY:
     st.error("網站尚未設定 GEMINI_API_KEY，請管理者到 Secrets 設定（見 docs/deploy.md）。")
 
 # 各部門的功能直接列在上方分頁；部門顧問放最後。待辦、AI Agent 問答、行事曆、報帳在側邊欄「幹部共用」。
 # 有些部門的功能需要先在分頁上方選擇對象（例如活動），所以先取得分頁清單（會先畫出上方的選單），再建立分頁。
+# 每個功能模組對應的分頁；部門負責哪些模組由社團設定決定（社團可以自訂分工）
+MODULE_TABS: dict[str, Callable[[], list[tuple[str, Callable[[], None]]]]] = {
+    FEATURE_PRESIDENT: lambda: [("社團總覽", lambda: president_page(ctx))],
+    FEATURE_MEETINGS: lambda: meeting_tabs(ctx),
+    FEATURE_MARKETING: lambda: [("社群數據診斷", lambda: diagnosis_page(ctx)), ("月報與趨勢", lambda: monthly_page(ctx))],
+    FEATURE_EVENTS: lambda: event_tabs(ctx),
+    FEATURE_PR: lambda: pr_tabs(ctx),
+    FEATURE_SPEAKERS: lambda: speaker_tabs(ctx),
+    # 財務是部門唯一的功能時展開成多個分頁；部門還有其他功能（例如社長）時收在一個「財務管理」分頁
+    FEATURE_FINANCE: lambda: finance_tabs(ctx) if len(features) == 1 else [("財務管理", lambda: finance_page(ctx))],
+}
 pages: list[tuple[str, Callable[[], None]]] = []
-if FEATURE_PRESIDENT in features:
-    pages.append(("社團總覽", lambda: president_page(ctx)))
-    if FEATURE_FINANCE in features:
-        pages.append(("財務管理", lambda: finance_page(ctx)))  # 社長的財務功能收在一個分頁裡
-elif FEATURE_FINANCE in features:
-    pages += finance_tabs(ctx)
-if FEATURE_MEETINGS in features:
-    pages += meeting_tabs(ctx)
-if FEATURE_MARKETING in features:
-    pages += [("社群數據診斷", lambda: diagnosis_page(ctx)), ("月報與趨勢", lambda: monthly_page(ctx)),
-              ("活動宣傳企劃", lambda: campaign_page(ctx))]
-if FEATURE_EVENTS in features:
-    pages += event_tabs(ctx)
-if FEATURE_PR in features:
-    pages += pr_tabs(ctx)
-if FEATURE_SPEAKERS in features:
-    pages += speaker_tabs(ctx)
+for feature in features:
+    if feature in MODULE_TABS:
+        pages += MODULE_TABS[feature]()
 pages.append(("部門顧問", lambda: advisor_page(ctx)))
 
 for tab, (_, render) in zip(st.tabs([name for name, _ in pages]), pages):

@@ -18,7 +18,7 @@ def make_advice() -> Advice:
 
 
 def test_departments_defined():
-    assert list(DEPARTMENTS) == ["president", "marketing", "pr", "finance", "events", "minutes", "courses", "speakers", "venue", "design", "members"]
+    assert list(DEPARTMENTS) == ["president", "marketing", "pr", "finance", "events", "minutes", "courses", "speakers", "venue", "members"]
     assert not get_department("marketing").beta
     assert all(d.beta for k, d in DEPARTMENTS.items() if k != "marketing")
     assert get_department("finance").label.endswith("（測試版）")
@@ -74,3 +74,19 @@ def test_advice_markdown():
     md = advice_markdown("財務", "怎麼分配？", make_advice())
     assert "財務部門顧問建議" in md and "預算表欄位" in md and "**活動**" in md
     assert "場地｜器材" in md  # 表格內的直線符號已轉成全形
+
+
+def test_features_reassigned_and_custom_department():
+    from club_agent.departments import FEATURE_EVENTS, FEATURE_PR, FEATURE_SPEAKERS, ClubSettings, DepartmentConfig, department_retriever
+
+    s = ClubSettings.default()
+    assert s.features("pr") == (FEATURE_PR,)
+    s = s.model_copy(update={"departments": {**s.departments, "pr": DepartmentConfig(enabled=True, features=[FEATURE_SPEAKERS, FEATURE_PR])}})
+    assert s.features("pr") == (FEATURE_PR, FEATURE_SPEAKERS)  # 依功能模組的固定順序
+    s, key = s.with_custom("學術部", [FEATURE_EVENTS], "負責讀書會")
+    assert key.startswith("custom_") and s.enabled_keys()[-1] == key
+    dept = s.department(key)
+    assert dept.name == "學術部" and dept.features == (FEATURE_EVENTS,) and "活動專案" in dept.focus
+    assert s.name("design") == "美宣"  # 已併入行銷的舊部門
+    assert department_retriever(key).chunks  # 自訂部門使用共用知識庫
+    assert any("design.md" == c.source for c in department_retriever("marketing").chunks)  # 美宣知識併入行銷

@@ -2,6 +2,9 @@
 
 每個社團可以選擇啟用哪些部門、自訂部門名稱，並填寫「部門細節」（例如報帳規定、
 固定開會時間），AI 會依這些細節微調建議。行銷為正式模組，其餘部門標示為測試版。
+
+「功能模組」（FEATURES）和部門是分開的：每個部門預設負責哪些模組由 Department.features 決定，
+社團可以在設定中改變分工（例如公關兼講者、活動兼總務），也可以新增系統沒有的自訂部門並指定它負責的模組。
 """
 
 from __future__ import annotations
@@ -21,6 +24,18 @@ FEATURE_PR = "pr_tools"  # 合作對象名單、贊助對象建議、對外信�
 FEATURE_EVENTS = "event_projects"  # 活動專案：企劃書、籌備清單、細流、回饋表單、成果報告
 FEATURE_SPEAKERS = "speaker_tools"  # 講座邀約、時間敲定、信件與宣傳通知
 FEATURE_FINANCE = "finance_tools"  # 財務管理（以財務密碼上鎖，財務與社長使用）
+
+# 社團可以分配給部門的功能模組（設定頁的選項，依顯示順序）
+FEATURES: dict[str, tuple[str, str]] = {
+    FEATURE_PRESIDENT: ("社團總覽", "各部門進度、會議時間表與議程"),
+    FEATURE_MEETINGS: ("會議記錄", "上傳會議記錄、整理重點、記錄問答"),
+    FEATURE_MARKETING: ("社群數據與月報", "貼文數據診斷、月報與趨勢"),
+    FEATURE_EVENTS: ("活動專案", "企劃書、籌備清單、細流、回饋表單、成果報告"),
+    FEATURE_PR: ("合作與贊助", "找贊助對象、合作對象、合作信件"),
+    FEATURE_SPEAKERS: ("講座管理", "講者邀約、時間敲定、信件與通知"),
+    FEATURE_FINANCE: ("財務管理", "報帳審核、帳簿、預算、報表（財務密碼上鎖）"),
+}
+LEGACY_NAMES = {"design": "美宣"}  # 已併入行銷的舊部門，舊紀錄仍顯示原名稱
 
 
 @dataclass(frozen=True)
@@ -56,9 +71,9 @@ DEPARTMENTS: dict[str, Department] = {
             name="行銷",
             beta=False,
             advisor_role="資深校園社群行銷顧問",
-            focus=("社群經營與數據解讀", "活動宣傳時程", "多平台文案", "品牌形象一致性"),
-            example_questions=("粉專觸及最近一直下降，下個月該怎麼調整發文策略？", "招生季快到了，要怎麼規劃兩週的宣傳？"),
-            details_hint="例：主要經營 IG，每週發 2 篇；主視覺色為深藍與米白；限動由副社長審核後發布",
+            focus=("社群經營與數據解讀", "活動宣傳時程", "多平台文案", "品牌形象與視覺設計", "海報與貼文設計需求"),
+            example_questions=("粉專觸及最近一直下降，下個月該怎麼調整發文策略？", "成果展海報要怎麼寫設計需求？"),
+            details_hint="例：主要經營 IG，每週發 2 篇；主視覺色為深藍與米白、字體用思源黑體；海報需提前兩週完成",
             features=(FEATURE_MARKETING,),
         ),
         Department(
@@ -123,14 +138,6 @@ DEPARTMENTS: dict[str, Department] = {
             details_hint="例：社辦在學生活動中心 3 樓；常借場地為小福樓會議室；器材有相機 3 台、腳架 5 支",
         ),
         Department(
-            key="design",
-            name="美宣",
-            advisor_role="社團視覺設計與美宣顧問",
-            focus=("海報與貼文設計需求", "品牌視覺規範", "設計排程", "印刷與輸出"),
-            example_questions=("成果展海報要怎麼寫設計需求給美宣？", "我們社團需要一份視覺規範，要包含什麼？"),
-            details_hint="例：主色 #1F3A5F、輔色米白；字體用思源黑體；海報需提前兩週完成",
-        ),
-        Department(
             key="members",
             name="人資／社員",
             advisor_role="社團人資與組織發展顧問",
@@ -152,6 +159,11 @@ class DepartmentConfig(BaseModel):
     enabled: bool = False
     display_name: str = Field(default="", description="社團自訂的部門名稱，空白時使用預設名稱")
     details: str = Field(default="", description="部門細節，AI 會參考")
+    features: list[str] | None = Field(default=None, description="這個部門負責的功能模組；None 表示使用部門預設")
+    custom: bool = Field(default=False, description="社團自訂的部門（系統沒有的部門）")
+
+
+CUSTOM_PREFIX = "custom_"
 
 
 class MeetingDefaults(BaseModel):
@@ -173,15 +185,52 @@ class ClubSettings(BaseModel):
     def config(self, key: str) -> DepartmentConfig:
         return self.departments.get(key) or DepartmentConfig()
 
+    def custom_keys(self) -> list[str]:
+        return [k for k, c in self.departments.items() if c.custom]
+
+    def all_keys(self) -> list[str]:
+        """系統部門（依 DEPARTMENTS 順序）＋自訂部門（依新增順序）。"""
+        return [*DEPARTMENTS, *self.custom_keys()]
+
     def enabled_keys(self) -> list[str]:
-        """依 DEPARTMENTS 的順序列出已啟用的部門。"""
-        return [k for k in DEPARTMENTS if self.config(k).enabled]
+        """依 DEPARTMENTS 的順序列出已啟用的部門，自訂部門排在後面。"""
+        return [k for k in self.all_keys() if self.config(k).enabled]
+
+    def features(self, key: str) -> tuple[str, ...]:
+        """這個部門負責的功能模組（社團自訂的分工優先，否則用部門預設）。"""
+        cfg = self.config(key)
+        if cfg.features is not None:
+            return tuple(f for f in FEATURES if f in cfg.features)
+        return DEPARTMENTS[key].features if key in DEPARTMENTS else ()
+
+    def department(self, key: str) -> Department:
+        """部門定義；自訂部門依名稱與負責的模組產生一個通用的顧問角色。"""
+        if key in DEPARTMENTS:
+            return DEPARTMENTS[key]
+        name = self.name(key)
+        focus = tuple(FEATURES[f][0] for f in self.features(key)) or ("部門營運與分工",)
+        return Department(
+            key=key, name=name, advisor_role=f"學生社團「{name}」的營運顧問", focus=(*focus, "工作規劃與交接"),
+            example_questions=(f"{name}這學期的工作要怎麼規劃？", f"{name}的工作要怎麼分配給組員？"),
+            details_hint="例：這個部門負責的工作、固定時程、和其他部門怎麼分工",
+            features=self.features(key),
+        )
+
+    def with_custom(self, name: str, features: list[str], details: str = "") -> tuple[ClubSettings, str]:
+        """新增一個自訂部門；回傳 (新設定, 部門代號)。"""
+        import uuid
+
+        key = f"{CUSTOM_PREFIX}{uuid.uuid4().hex[:6]}"
+        config = DepartmentConfig(enabled=True, display_name=name.strip(), details=details, features=features, custom=True)
+        return self.model_copy(update={"departments": {**self.departments, key: config}}), key
 
     def name(self, key: str) -> str:
         cfg = self.config(key)
         if cfg.display_name.strip():
             return cfg.display_name.strip()
-        return DEPARTMENTS[key].name if key in DEPARTMENTS else key
+        if key in DEPARTMENTS:
+            return DEPARTMENTS[key].name
+        return LEGACY_NAMES.get(key, key)
 
     def label(self, key: str) -> str:
         """選單與列表顯示用的部門名稱。測試版標示只出現在部門頁面內，不放在選單中。"""
@@ -207,12 +256,16 @@ def get_department(key: str) -> Department:
 
 
 def department_retriever(key: str, kb_dir: Path = DEFAULT_KB_DIR) -> BM25Retriever:
-    """部門顧問的知識庫：行銷沿用行銷模組知識庫；其他部門用各自資料夾，再加上全社團共用的校園規範。"""
-    get_department(key)
+    """部門顧問的知識庫：行銷沿用行銷模組知識庫（加上美宣）；其他部門用各自資料夾，再加上全社團共用的校園規範。
+    自訂部門只用共用的校園規範。"""
     if key == "marketing":
-        return BM25Retriever.from_directory(kb_dir)
+        retriever = BM25Retriever.from_directory(kb_dir)
+        design = kb_dir / "departments" / "design.md"
+        if design.exists():
+            retriever = BM25Retriever([*retriever.chunks, *split_markdown(design.name, design.read_text(encoding="utf-8"))])
+        return retriever
     chunks: list[Chunk] = []
-    for path in sorted((kb_dir / "departments").glob(f"{key}.md")):
+    for path in sorted((kb_dir / "departments").glob(f"{key}.md")) if key in DEPARTMENTS else []:
         chunks.extend(split_markdown(path.name, path.read_text(encoding="utf-8")))
     for name in SHARED_KB_FILES:
         path = kb_dir / name
