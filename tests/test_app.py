@@ -588,3 +588,26 @@ def test_design_request_flow(monkeypatch):
     _button(at, "AI 產生設計說明與文案").click().run()
     assert not at.exception
     assert any("**主標：** 看見城市" in m.value for m in at.markdown)
+
+
+def test_courses_plan_apply_and_calendar(monkeypatch):
+    from club_agent.schemas import CoursePlan
+    from test_courses import make_plan
+
+    original = GeminiLLM.structured
+    monkeypatch.setattr(GeminiLLM, "structured", lambda self, system, user, output_type: (
+        make_plan(12) if output_type is CoursePlan else original(self, system, user, output_type)))
+    at = _app()
+    _signup(at)
+    _open(at, "settings")
+    at.checkbox(key="set_en_courses").check()
+    _button(at, "儲存部門設定").click().run()
+    _switch(at, "courses")
+    assert [t.label for t in at.tabs][:2] == ["學期課表（0）", "出席與回饋"]
+    _button(at, "產生課表").click().run()
+    assert not at.exception
+    _button(at, "套用到課表（新增 12 堂）").click().run()
+    assert any("已新增 12 堂社課" in s.value for s in at.success)
+    assert "學期課表（12）" in [t.label for t in at.tabs]
+    _open(at, "calendar")
+    assert any("社課：第1堂" in m.value for m in at.markdown)

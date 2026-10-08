@@ -432,3 +432,21 @@ class BrandGuideDraft(BaseModel):
     tone: str = Field(description="文案語氣")
     dos: list[str]
     donts: list[str]
+
+
+# ---------------------------------------------------------------------------
+# 課程
+# ---------------------------------------------------------------------------
+
+
+class CoursePlanItem(BaseModel):
+    title: str = Field(description="這堂課的主題")
+    objectives: list[str] = Field(description="學習目標，1–3 項，具體可檢核")
+    activities: list[str] = Field(description="課堂活動與時間分配，例如：講解 30 分鐘、分組實作 60 分鐘")
+    materials: list[str] = Field(description="需要準備的材料或器材；沒有時為空")
+    instructor: str = Field(description="建議由誰授課，例如：社內幹部、邀請講者；不知道時填空字串")
+
+
+class CoursePlan(BaseModel):
+    sessions: list[CoursePlanItem] = Field(description="依上課順序排列，堂數等於要求的堂數")
+    notes: list[str] = Field(description="規劃說明與提醒，例如：期中安排成果分享維持動機")

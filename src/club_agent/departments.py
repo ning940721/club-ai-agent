@@ -25,6 +25,7 @@ FEATURE_EVENTS = "event_projects"  # 活動專案：企劃書、籌備清單、�
 FEATURE_SPEAKERS = "speaker_tools"  # 講座邀約、時間敲定、信件與宣傳通知
 FEATURE_FINANCE = "finance_tools"  # 財務管理（以財務密碼上鎖，財務與社長使用）
 FEATURE_DESIGN = "design_tools"  # 美宣：設計需求單、視覺規範（併入行銷）
+FEATURE_COURSES = "course_tools"  # 社課：學期課表、出席與回饋
 
 # 社團可以分配給部門的功能模組（設定頁的選項，依顯示順序）
 FEATURES: dict[str, tuple[str, str]] = {
@@ -35,6 +36,7 @@ FEATURES: dict[str, tuple[str, str]] = {
     FEATURE_EVENTS: ("活動專案", "企劃書、籌備清單、細流、回饋表單、成果報告"),
     FEATURE_PR: ("合作與贊助", "找贊助對象、合作對象、合作信件"),
     FEATURE_SPEAKERS: ("講座管理", "講者邀約、時間敲定、信件與通知"),
+    FEATURE_COURSES: ("社課", "AI 規劃學期課表、出席與回饋"),
     FEATURE_FINANCE: ("財務管理", "報帳審核、帳簿、預算、報表（財務密碼上鎖）"),
 }
 LEGACY_NAMES = {"design": "美宣"}  # 已併入行銷的舊部門，舊紀錄仍顯示原名稱
@@ -121,6 +123,7 @@ DEPARTMENTS: dict[str, Department] = {
             focus=("學期社課規劃", "講師邀請", "課程內容與教案", "出席率與學習回饋"),
             example_questions=("社課出席率越來越低，要怎麼提升？", "幫我規劃一學期 12 堂的初學者社課"),
             details_hint="例：社課每週四晚上；講師費每堂 1,500 元；學員多為零基礎",
+            features=(FEATURE_COURSES,),
         ),
         Department(
             key="speakers",

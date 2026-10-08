@@ -1,6 +1,7 @@
 from .advisor import DepartmentAdvisor
 from .design import DesignAssistant
 from .club_qa import ClubQA, club_retriever
+from .courses import CoursePlanner
 from .critic import CriticAgent
 from .diagnostic import DiagnosticAgent
 from .drafting import DraftingAgent
@@ -14,6 +15,7 @@ from .secretary import MeetingQA, MeetingSummarizer
 
 __all__ = [
     "ClubQA",
+    "CoursePlanner",
     "CriticAgent",
     "DepartmentAdvisor",
     "DesignAssistant",

@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 
 from .agenda import end_time, list_plans, parse_time
 from .departments import ClubSettings
+from .courses import list_sessions
 from .design import OPEN_STATUSES as DESIGN_OPEN
 from .design import list_requests as list_design_requests
 from .meetings import list_meetings
@@ -137,6 +138,15 @@ def club_events(store, club_id: str, settings: ClubSettings | None = None) -> li
                 CalendarEvent(
                     id=f"partner-follow-{partner.id}", date=partner.follow_up, title=f"追蹤合作：{partner.name}（{partner.stage}）",
                     kind="截止", department="pr", note=partner.event, source="合作對象",
+                )
+            )
+
+    for s in list_sessions(store, club_id):
+        if s.status != "取消" and _valid_date(s.date):
+            events.append(
+                CalendarEvent(
+                    id=f"course-{s.id}", date=s.date, title=f"社課：{s.title}", time=s.start, end=s.end, kind="活動",
+                    department="courses", location=s.location, note=s.instructor, source="社課",
                 )
             )
 

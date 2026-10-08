@@ -19,6 +19,7 @@ sys.path.insert(0, str(ROOT / "src"))
 import streamlit as st  # noqa: E402
 
 from club_agent.departments import (  # noqa: E402
+    FEATURE_COURSES,
     FEATURE_DESIGN,
     FEATURE_EVENTS,
     FEATURE_FINANCE,
@@ -31,6 +32,7 @@ from club_agent.departments import (  # noqa: E402
 )
 from club_agent.store import LocalClubStore, StoreError  # noqa: E402
 from club_agent.web.calendar_pages import calendar_page  # noqa: E402
+from club_agent.web.course_pages import course_tabs  # noqa: E402
 from club_agent.web.design_pages import design_request_page, design_tabs  # noqa: E402
 from club_agent.web.event_pages import event_tabs  # noqa: E402
 from club_agent.web.finance_pages import finance_page, finance_tabs, reimburse_page  # noqa: E402
@@ -205,6 +207,7 @@ MODULE_TABS: dict[str, Callable[[], list[tuple[str, Callable[[], None]]]]] = {
     FEATURE_EVENTS: lambda: event_tabs(ctx),
     FEATURE_PR: lambda: pr_tabs(ctx),
     FEATURE_SPEAKERS: lambda: speaker_tabs(ctx),
+    FEATURE_COURSES: lambda: course_tabs(ctx),
     # 財務是部門唯一的功能時展開成多個分頁；部門還有其他功能（例如社長）時收在一個「財務管理」分頁
     FEATURE_FINANCE: lambda: finance_tabs(ctx) if len(features) == 1 else [("財務管理", lambda: finance_page(ctx))],
 }
