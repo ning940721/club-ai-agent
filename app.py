@@ -28,6 +28,7 @@ from club_agent.departments import (  # noqa: E402
     FEATURE_PR,
     FEATURE_PRESIDENT,
     FEATURE_SPEAKERS,
+    FEATURE_VENUE,
     ClubSettings,
 )
 from club_agent.store import LocalClubStore, StoreError  # noqa: E402
@@ -52,6 +53,7 @@ from club_agent.web.meeting_pages import meeting_tabs  # noqa: E402
 from club_agent.web.pr_pages import pr_tabs  # noqa: E402
 from club_agent.web.president_pages import president_page  # noqa: E402
 from club_agent.web.speaker_pages import speaker_tabs  # noqa: E402
+from club_agent.web.venue_pages import venue_tabs  # noqa: E402
 
 
 st.set_page_config(page_title="社團營運平台", page_icon=":material/groups:", layout="wide")
@@ -208,6 +210,7 @@ MODULE_TABS: dict[str, Callable[[], list[tuple[str, Callable[[], None]]]]] = {
     FEATURE_PR: lambda: pr_tabs(ctx),
     FEATURE_SPEAKERS: lambda: speaker_tabs(ctx),
     FEATURE_COURSES: lambda: course_tabs(ctx),
+    FEATURE_VENUE: lambda: venue_tabs(ctx),
     # 財務是部門唯一的功能時展開成多個分頁；部門還有其他功能（例如社長）時收在一個「財務管理」分頁
     FEATURE_FINANCE: lambda: finance_tabs(ctx) if len(features) == 1 else [("財務管理", lambda: finance_page(ctx))],
 }

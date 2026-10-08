@@ -611,3 +611,26 @@ def test_courses_plan_apply_and_calendar(monkeypatch):
     assert "學期課表（12）" in [t.label for t in at.tabs]
     _open(at, "calendar")
     assert any("社課：第1堂" in m.value for m in at.markdown)
+
+
+def test_venue_equipment_loan_flow():
+    from club_agent.store import LocalClubStore
+    from club_agent.venue import Equipment, save_equipment
+
+    at = _app()
+    _signup(at)
+    _open(at, "settings")
+    at.checkbox(key="set_en_venue").check()
+    _button(at, "儲存部門設定").click().run()
+    store = LocalClubStore(os.environ["CLUB_AGENT_DATA_DIR"])
+    save_equipment(store, at.session_state.club_id, Equipment(name="腳架", quantity=2))
+    _switch(at, "venue")
+    assert [t.label for t in at.tabs][:3] == ["場地申請（0 待申請）", "器材借還（0 借出中）", "器材清單（1）"]
+    _input(at, "借用人＊").input("小明")
+    _button(at, "借出").click().run()
+    assert any("小明 借用 腳架 × 1" in s.value for s in at.success)
+    _button(at, "已歸還").click().run()
+    assert any("已歸還：腳架 × 1" in s.value for s in at.success)
+    _input(at, "場地＊").input("演藝廳")
+    _button(at, "新增").click().run()
+    assert any("已新增「演藝廳」" in s.value for s in at.success)

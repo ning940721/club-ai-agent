@@ -27,6 +27,7 @@ from .partners import list_partners
 from .projects import list_projects
 from .speakers import ACTIVE_STAGES, list_talks
 from .tasks import list_tasks
+from .venue import ACTIVE_BOOKING, list_bookings, list_loans
 
 COLLECTION = "events"
 KINDS = ("活動", "會議", "截止", "其他")
@@ -147,6 +148,30 @@ def club_events(store, club_id: str, settings: ClubSettings | None = None) -> li
                 CalendarEvent(
                     id=f"course-{s.id}", date=s.date, title=f"社課：{s.title}", time=s.start, end=s.end, kind="活動",
                     department="courses", location=s.location, note=s.instructor, source="社課",
+                )
+            )
+
+    for b in list_bookings(store, club_id):
+        if b.status in ACTIVE_BOOKING and _valid_date(b.date):
+            events.append(
+                CalendarEvent(
+                    id=f"venue-{b.id}", date=b.date, title=f"場地：{b.venue}（{b.purpose or b.event or b.status}）", time=b.start,
+                    end=b.end, kind="其他", department="venue", location=b.venue, note=b.status, source="場地申請",
+                )
+            )
+        if b.status == "待申請" and _valid_date(b.apply_by):
+            events.append(
+                CalendarEvent(
+                    id=f"venue-apply-{b.id}", date=b.apply_by, title=f"申請場地截止：{b.venue}（{b.date} 使用）", kind="截止",
+                    department="venue", source="場地申請",
+                )
+            )
+    for x in list_loans(store, club_id):
+        if x.outstanding and _valid_date(x.due):
+            events.append(
+                CalendarEvent(
+                    id=f"loan-{x.id}", date=x.due, title=f"器材歸還：{x.equipment_name} × {x.quantity}（{x.borrower}）", kind="截止",
+                    department="venue", source="器材借還",
                 )
             )
 
