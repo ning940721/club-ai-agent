@@ -399,3 +399,36 @@ class MarketingMonthlyReview(BaseModel):
     next_month_plan: list[ContentPlanItem] = Field(description="下個月的內容規劃，4–8 篇")
     kpi_targets: list[str] = Field(description="下個月的目標，具體可衡量，例如：平均互動率由 5.2% 提升到 6%")
     data_to_collect: list[str] = Field(description="下個月應該補記的資料（依資料完整度）；資料完整時為空")
+
+
+# ---------------------------------------------------------------------------
+# 美宣
+# ---------------------------------------------------------------------------
+
+
+class DesignBrief(BaseModel):
+    headline: str = Field(description="主標，10 字內，吸引目光")
+    subheadline: str = Field(description="副標，補充重點")
+    body_copy: str = Field(description="內文：時間、地點、報名方式等必要資訊，條列清楚；未知資訊寫【待補】")
+    cta: str = Field(description="行動呼籲，例如：掃 QR code 報名")
+    hashtags: list[str] = Field(description="3–6 個 hashtag；海報等印刷品可以為空")
+    layout: list[str] = Field(description="版面建議，由上到下的區塊與視覺層級")
+    visual_direction: str = Field(description="視覺方向：風格、照片或插圖、氛圍")
+    color_usage: str = Field(description="依視覺規範說明顏色與字體怎麼用；沒有規範時給建議")
+    checklist: list[str] = Field(description="上線或印刷前要檢查的項目，例如：日期星期是否正確、QR code 可掃描")
+
+
+class BrandColorDraft(BaseModel):
+    name: str
+    hex: str = Field(description="色碼 #RRGGBB")
+    usage: str
+
+
+class BrandGuideDraft(BaseModel):
+    colors: list[BrandColorDraft] = Field(description="3–5 個顏色：主色、輔色、強調色、背景、文字")
+    heading_font: str = Field(description="標題字體，優先建議可免費商用的中文字體，例如思源黑體、jf open 粉圓")
+    body_font: str
+    logo_rules: str
+    tone: str = Field(description="文案語氣")
+    dos: list[str]
+    donts: list[str]

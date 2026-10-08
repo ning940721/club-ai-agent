@@ -253,7 +253,7 @@ def test_shared_features_live_in_sidebar():
     _signup(at)
     _switch(at, "marketing")
     labels = [t.label for t in at.tabs]
-    assert labels == ["社群數據診斷", "月報與趨勢", "部門顧問"]
+    assert labels == ["社群數據診斷", "月報與趨勢", "設計需求（0）", "視覺規範", "部門顧問"]
     for page, title in (("tasks", "待辦與進度"), ("feed", "AI Agent 問答"), ("calendar", "行事曆"), ("reimburse", "報帳申請")):
         _open(at, page)
         assert title in _page_title(at)
@@ -564,3 +564,27 @@ def test_settings_reassign_features_and_add_custom_department():
     assert "找贊助對象" in labels and "講座總覽（0）" in labels
     _switch(at, key)
     assert "學術部" in _page_title(at) and [t.label for t in at.tabs] == ["部門顧問"]  # 還沒有活動時只有選單與部門顧問
+
+
+def test_design_request_flow(monkeypatch):
+    from club_agent.schemas import DesignBrief
+
+    brief = DesignBrief(headline="看見城市", subheadline="成果展", body_copy="【待補：日期】", cta="報名", hashtags=["#攝影"],
+                        layout=["主視覺"], visual_direction="底片感", color_usage="深藍", checklist=["確認日期"])
+    original = GeminiLLM.structured
+    monkeypatch.setattr(GeminiLLM, "structured", lambda self, system, user, output_type: (
+        brief if output_type is DesignBrief else original(self, system, user, output_type)))
+    at = _app()
+    _signup(at)
+    _switch(at, "events")
+    _open(at, "design")  # 活動部提出需求
+    _input(at, "需求名稱＊").input("成果展海報")
+    _button(at, "送出需求").click().run()
+    assert any("已送出「成果展海報」" in s.value for s in at.success)
+    assert any("**待接單**　成果展海報" in m.value for m in at.markdown)
+
+    _switch(at, "marketing")  # 行銷接單
+    assert "設計需求（1）" in [t.label for t in at.tabs]
+    _button(at, "AI 產生設計說明與文案").click().run()
+    assert not at.exception
+    assert any("**主標：** 看見城市" in m.value for m in at.markdown)

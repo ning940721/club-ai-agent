@@ -24,12 +24,14 @@ FEATURE_PR = "pr_tools"  # 合作對象名單、贊助對象建議、對外信�
 FEATURE_EVENTS = "event_projects"  # 活動專案：企劃書、籌備清單、細流、回饋表單、成果報告
 FEATURE_SPEAKERS = "speaker_tools"  # 講座邀約、時間敲定、信件與宣傳通知
 FEATURE_FINANCE = "finance_tools"  # 財務管理（以財務密碼上鎖，財務與社長使用）
+FEATURE_DESIGN = "design_tools"  # 美宣：設計需求單、視覺規範（併入行銷）
 
 # 社團可以分配給部門的功能模組（設定頁的選項，依顯示順序）
 FEATURES: dict[str, tuple[str, str]] = {
     FEATURE_PRESIDENT: ("社團總覽", "各部門進度、會議時間表與議程"),
     FEATURE_MEETINGS: ("會議記錄", "上傳會議記錄、整理重點、記錄問答"),
     FEATURE_MARKETING: ("社群數據與月報", "貼文數據診斷、月報與趨勢"),
+    FEATURE_DESIGN: ("美宣設計", "處理各部門的設計需求、視覺規範、AI 設計說明與文案"),
     FEATURE_EVENTS: ("活動專案", "企劃書、籌備清單、細流、回饋表單、成果報告"),
     FEATURE_PR: ("合作與贊助", "找贊助對象、合作對象、合作信件"),
     FEATURE_SPEAKERS: ("講座管理", "講者邀約、時間敲定、信件與通知"),
@@ -74,7 +76,7 @@ DEPARTMENTS: dict[str, Department] = {
             focus=("社群經營與數據解讀", "活動宣傳時程", "多平台文案", "品牌形象與視覺設計", "海報與貼文設計需求"),
             example_questions=("粉專觸及最近一直下降，下個月該怎麼調整發文策略？", "成果展海報要怎麼寫設計需求？"),
             details_hint="例：主要經營 IG，每週發 2 篇；主視覺色為深藍與米白、字體用思源黑體；海報需提前兩週完成",
-            features=(FEATURE_MARKETING,),
+            features=(FEATURE_MARKETING, FEATURE_DESIGN),
         ),
         Department(
             key="pr",

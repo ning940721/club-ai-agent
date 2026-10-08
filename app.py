@@ -19,6 +19,7 @@ sys.path.insert(0, str(ROOT / "src"))
 import streamlit as st  # noqa: E402
 
 from club_agent.departments import (  # noqa: E402
+    FEATURE_DESIGN,
     FEATURE_EVENTS,
     FEATURE_FINANCE,
     FEATURE_MARKETING,
@@ -30,6 +31,7 @@ from club_agent.departments import (  # noqa: E402
 )
 from club_agent.store import LocalClubStore, StoreError  # noqa: E402
 from club_agent.web.calendar_pages import calendar_page  # noqa: E402
+from club_agent.web.design_pages import design_request_page, design_tabs  # noqa: E402
 from club_agent.web.event_pages import event_tabs  # noqa: E402
 from club_agent.web.finance_pages import finance_page, finance_tabs, reimburse_page  # noqa: E402
 from club_agent.web.common_pages import (  # noqa: E402
@@ -134,6 +136,7 @@ SHARED_PAGES = {
     "feed": ("AI Agent 問答", ":material/smart_toy:", feed_page),
     "calendar": ("行事曆", ":material/calendar_month:", calendar_page),
     "reimburse": ("報帳申請", ":material/receipt_long:", reimburse_page),
+    "design": ("設計需求", ":material/palette:", design_request_page),
 }
 OTHER_PAGES = {
     "settings": ("社團設定", ":material/settings:", settings_page),
@@ -198,6 +201,7 @@ MODULE_TABS: dict[str, Callable[[], list[tuple[str, Callable[[], None]]]]] = {
     FEATURE_PRESIDENT: lambda: [("社團總覽", lambda: president_page(ctx))],
     FEATURE_MEETINGS: lambda: meeting_tabs(ctx),
     FEATURE_MARKETING: lambda: [("社群數據診斷", lambda: diagnosis_page(ctx)), ("月報與趨勢", lambda: monthly_page(ctx))],
+    FEATURE_DESIGN: lambda: design_tabs(ctx),
     FEATURE_EVENTS: lambda: event_tabs(ctx),
     FEATURE_PR: lambda: pr_tabs(ctx),
     FEATURE_SPEAKERS: lambda: speaker_tabs(ctx),

@@ -1,4 +1,5 @@
 from .advisor import DepartmentAdvisor
+from .design import DesignAssistant
 from .club_qa import ClubQA, club_retriever
 from .critic import CriticAgent
 from .diagnostic import DiagnosticAgent
@@ -15,6 +16,7 @@ __all__ = [
     "ClubQA",
     "CriticAgent",
     "DepartmentAdvisor",
+    "DesignAssistant",
     "DiagnosticAgent",
     "DraftingAgent",
     "EventPlanner",
