@@ -22,6 +22,7 @@ from .courses import list_sessions
 from .design import OPEN_STATUSES as DESIGN_OPEN
 from .design import list_requests as list_design_requests
 from .meetings import list_meetings
+from .members import list_applicants
 from .partners import ACTIVE_STAGES as PARTNER_ACTIVE
 from .partners import list_partners
 from .projects import list_projects
@@ -172,6 +173,15 @@ def club_events(store, club_id: str, settings: ClubSettings | None = None) -> li
                 CalendarEvent(
                     id=f"loan-{x.id}", date=x.due, title=f"器材歸還：{x.equipment_name} × {x.quantity}（{x.borrower}）", kind="截止",
                     department="venue", source="器材借還",
+                )
+            )
+
+    for a in list_applicants(store, club_id):
+        if a.result == "待面試" and _valid_date(a.interview_date):
+            events.append(
+                CalendarEvent(
+                    id=f"interview-{a.id}", date=a.interview_date, title=f"面試：{a.name}（{a.role}）", time=a.interview_time,
+                    kind="會議", department="members", note=a.interviewer, source="招生與面試",
                 )
             )
 

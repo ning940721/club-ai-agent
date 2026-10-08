@@ -634,3 +634,30 @@ def test_venue_equipment_loan_flow():
     _input(at, "場地＊").input("演藝廳")
     _button(at, "新增").click().run()
     assert any("已新增「演藝廳」" in s.value for s in at.success)
+
+
+def test_members_recruiting_and_handover(monkeypatch):
+    from club_agent.schemas import HandoverManual
+    from club_agent.store import LocalClubStore
+    from club_agent.members import Applicant, save_applicant
+
+    manual = HandoverManual(overview="公關部交接", responsibilities=["找贊助"], annual_timeline=[], how_tos=[], resources=[],
+                            lessons=["提早聯絡"], open_items=[], first_month=["認識合作店家"])
+    original = GeminiLLM.structured
+    monkeypatch.setattr(GeminiLLM, "structured", lambda self, system, user, output_type: (
+        manual if output_type is HandoverManual else original(self, system, user, output_type)))
+    at = _app()
+    _signup(at)
+    _open(at, "settings")
+    at.checkbox(key="set_en_members").check()
+    _button(at, "儲存部門設定").click().run()
+    store = LocalClubStore(os.environ["CLUB_AGENT_DATA_DIR"])
+    save_applicant(store, at.session_state.club_id, Applicant(name="小明", source="社博", result="錄取"))
+    _switch(at, "members")
+    assert [t.label for t in at.tabs][:3] == ["社員名單（0）", "招生與面試（1）", "交接手冊"]
+    _button(at, "把 1 位錄取者加入社員名單").click().run()
+    assert any("已加入 1 位社員：小明" in s.value for s in at.success)
+    assert "社員名單（1）" in [t.label for t in at.tabs]
+    _button(at, "產生交接手冊").click().run()
+    assert not at.exception
+    assert any("公關部交接" in m.value or "提早聯絡" in m.value for m in at.markdown)

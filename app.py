@@ -25,6 +25,7 @@ from club_agent.departments import (  # noqa: E402
     FEATURE_FINANCE,
     FEATURE_MARKETING,
     FEATURE_MEETINGS,
+    FEATURE_MEMBERS,
     FEATURE_PR,
     FEATURE_PRESIDENT,
     FEATURE_SPEAKERS,
@@ -50,6 +51,7 @@ from club_agent.web.context import AppContext  # noqa: E402
 from club_agent.web.style import inject_css, page_header, sidebar_brand  # noqa: E402
 from club_agent.web.marketing_pages import diagnosis_page, monthly_page  # noqa: E402
 from club_agent.web.meeting_pages import meeting_tabs  # noqa: E402
+from club_agent.web.member_pages import member_tabs  # noqa: E402
 from club_agent.web.pr_pages import pr_tabs  # noqa: E402
 from club_agent.web.president_pages import president_page  # noqa: E402
 from club_agent.web.speaker_pages import speaker_tabs  # noqa: E402
@@ -211,6 +213,7 @@ MODULE_TABS: dict[str, Callable[[], list[tuple[str, Callable[[], None]]]]] = {
     FEATURE_SPEAKERS: lambda: speaker_tabs(ctx),
     FEATURE_COURSES: lambda: course_tabs(ctx),
     FEATURE_VENUE: lambda: venue_tabs(ctx),
+    FEATURE_MEMBERS: lambda: member_tabs(ctx),
     # 財務是部門唯一的功能時展開成多個分頁；部門還有其他功能（例如社長）時收在一個「財務管理」分頁
     FEATURE_FINANCE: lambda: finance_tabs(ctx) if len(features) == 1 else [("財務管理", lambda: finance_page(ctx))],
 }

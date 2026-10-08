@@ -450,3 +450,46 @@ class CoursePlanItem(BaseModel):
 class CoursePlan(BaseModel):
     sessions: list[CoursePlanItem] = Field(description="依上課順序排列，堂數等於要求的堂數")
     notes: list[str] = Field(description="規劃說明與提醒，例如：期中安排成果分享維持動機")
+
+
+# ---------------------------------------------------------------------------
+# 人資：面試與交接
+# ---------------------------------------------------------------------------
+
+
+class InterviewQuestion(BaseModel):
+    question: str
+    purpose: str = Field(description="想了解什麼")
+    good_signs: str = Field(description="好的回答會有什麼特徵")
+
+
+class RubricItem(BaseModel):
+    criterion: str = Field(description="評分項目")
+    description: str = Field(description="1–5 分怎麼給的說明")
+
+
+class InterviewKit(BaseModel):
+    questions: list[InterviewQuestion] = Field(description="6–10 題，由破冰到深入")
+    rubric: list[RubricItem] = Field(description="3–5 個評分項目")
+    tips: list[str] = Field(description="面試流程與面試官的提醒，例如時間控制、避免詢問與能力無關的私人問題")
+
+
+class TimelineItem(BaseModel):
+    period: str = Field(description="時間，例如：9 月（開學）、期中前、寒假")
+    tasks: list[str]
+
+
+class HowTo(BaseModel):
+    task: str = Field(description="常見工作")
+    steps: list[str] = Field(description="具體步驟")
+
+
+class HandoverManual(BaseModel):
+    overview: str = Field(description="部門的角色與這一屆的總結（3–5 句）")
+    responsibilities: list[str] = Field(description="部門負責的工作")
+    annual_timeline: list[TimelineItem] = Field(description="一學年的工作時程")
+    how_tos: list[HowTo] = Field(description="常見工作的操作步驟，3–6 項")
+    resources: list[str] = Field(description="需要移交的帳號、檔案、聯絡對象；只列類型與位置，帳號密碼以【待補：私下移交】標示")
+    lessons: list[str] = Field(description="這一屆的經驗與教訓，依紀錄具體寫出")
+    open_items: list[str] = Field(description="還沒完成、需要下一屆接手的事項")
+    first_month: list[str] = Field(description="新幹部上任第一個月的待辦清單")

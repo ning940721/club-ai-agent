@@ -2,7 +2,17 @@
 
 from __future__ import annotations
 
-from .schemas import Advice, CampaignResult, DiagnosisReport, MarketingMonthlyReview, MeetingAnswer, MeetingSummary, ProgressBrief
+from .schemas import (
+    Advice,
+    CampaignResult,
+    DiagnosisReport,
+    HandoverManual,
+    InterviewKit,
+    MarketingMonthlyReview,
+    MeetingAnswer,
+    MeetingSummary,
+    ProgressBrief,
+)
 
 
 def _cell(text: object) -> str:
@@ -167,4 +177,26 @@ def monthly_report_markdown(club_name: str, month: str, rows: list[tuple[str, st
         out += ["", "## 下個月目標", *[f"- {x}" for x in r.kpi_targets]]
     if r.data_to_collect:
         out += ["", "## 下個月請補記的資料", *[f"- {x}" for x in r.data_to_collect]]
+    return "\n".join(out) + "\n"
+
+
+def interview_kit_markdown(club_name: str, role: str, k: InterviewKit) -> str:
+    out = [f"# {club_name} 面試題目：{role}", "", "## 題目", "| # | 題目 | 想了解什麼 | 好的回答 |", "|---|---|---|---|"]
+    out += [f"| {i} | {_cell(q.question)} | {_cell(q.purpose)} | {_cell(q.good_signs)} |" for i, q in enumerate(k.questions, 1)]
+    out += ["", "## 評分標準（1–5 分）", "| 項目 | 說明 |", "|---|---|", *[f"| {_cell(r.criterion)} | {_cell(r.description)} |" for r in k.rubric]]
+    out += ["", "## 面試官提醒", *[f"- {t}" for t in k.tips]]
+    return "\n".join(out) + "\n"
+
+
+def handover_markdown(club_name: str, department: str, h: HandoverManual) -> str:
+    out = [f"# {club_name} {department} 交接手冊", "", "## 部門概況", h.overview, "", "## 負責的工作", *[f"- {x}" for x in h.responsibilities]]
+    if h.annual_timeline:
+        out += ["", "## 年度時程", "| 時間 | 工作 |", "|---|---|", *[f"| {_cell(t.period)} | {_cell('；'.join(t.tasks))} |" for t in h.annual_timeline]]
+    for how in h.how_tos:
+        out += ["", f"### 怎麼做：{how.task}", *[f"{i}. {s}" for i, s in enumerate(how.steps, 1)]]
+    out += ["", "## 需要移交的資源", *[f"- {x}" for x in h.resources]]
+    out += ["", "## 經驗與教訓", *[f"- {x}" for x in h.lessons]]
+    if h.open_items:
+        out += ["", "## 未完成事項", *[f"- {x}" for x in h.open_items]]
+    out += ["", "## 上任第一個月", *[f"- [ ] {x}" for x in h.first_month]]
     return "\n".join(out) + "\n"
