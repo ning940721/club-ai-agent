@@ -20,6 +20,14 @@ from club_agent.schemas import (
 EXAMPLES = Path(__file__).parent.parent / "examples"
 
 
+@pytest.fixture(autouse=True)
+def _isolate_from_real_services(monkeypatch):
+    """網頁測試不讀 .streamlit/secrets.toml：不會連到真正的線上資料庫，也不會用到真的 AI 金鑰。"""
+    monkeypatch.setenv("CLUB_AGENT_TESTING", "1")
+    for name in ("SUPABASE_URL", "SUPABASE_KEY"):
+        monkeypatch.delenv(name, raising=False)
+
+
 class FakeLLM:
     """依輸出型別回傳預先準備的結果，並記錄每次呼叫。"""
 

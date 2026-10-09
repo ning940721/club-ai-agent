@@ -50,6 +50,16 @@
 - 社長：一鍵產生各部門進度彙整與下次會議議程。
 - 帳號可變更密碼；網頁程式拆分為 web/ 下的多個頁面檔。
 
+## 2026-10-09｜v0.26.0 線上資料庫（第六批）
+
+- 儲存層重構：BaseClubStore 集中帳號邏輯（建立、登入、改密碼、社團資料與設定）；LocalClubStore 存本機檔案；
+  新增 SupabaseClubStore（supabase_store.py）存在 Supabase：clubs、club_docs、club_records 三張表（docs/supabase_schema.sql，開啟 RLS 不設規則，只有 service_role 金鑰能讀寫）。
+- 線上版把讀過的資料暫存在記憶體（寫入同步更新、60 秒後重新讀取），分頁讀取超過 1000 筆的資料；網站以 st.cache_resource 共用同一個儲存層。
+- create_store：Secrets 有 SUPABASE_URL 與 SUPABASE_KEY 時用線上資料庫，否則用本機檔案；登入頁顯示目前的資料存放位置。
+- 搬資料工具：python -m club_agent.migrate（或雙擊「搬資料到線上資料庫.bat」）把 data/clubs 搬到線上，保留密碼雜湊與原本的 id，預設略過線上已存在的社團。
+- 自動測試不讀 .streamlit/secrets.toml（CLUB_AGENT_TESTING），不會連到真正的資料庫；以假的 Supabase 用戶端測試線上版。
+- docs/deploy.md 改寫為完整上線教學（Supabase → 搬資料 → Streamlit Community Cloud）。
+
 ## 2026-10-09｜v0.25.0 課程與講者合併、人資拿掉交接手冊分頁
 
 - 課程與講者合併為「課程與講座」（courses，負責社課＋講座管理兩個模組）；顧問專長與知識庫（courses.md＋speakers.md）合併。

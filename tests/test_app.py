@@ -705,3 +705,34 @@ def test_each_department_sees_its_own_tasks():
     assert view.label == "查看哪個部門的待辦" and view.value == "pr"
     _switch(at, "events")
     assert any("活動目前沒有未完成的待辦" in c.value for c in at.caption)
+
+
+def test_app_runs_on_online_database(monkeypatch):
+    import uuid
+
+    from club_agent.supabase_store import SupabaseClubStore
+    from fake_supabase import FakeClient
+
+    client = FakeClient()
+    monkeypatch.setattr(SupabaseClubStore, "connect", classmethod(lambda cls, url, key: cls(client)))
+    monkeypatch.setenv("SUPABASE_URL", f"https://test-{uuid.uuid4().hex[:6]}.supabase.co")  # 每個測試各自的連線
+    monkeypatch.setenv("SUPABASE_KEY", "service-key")
+    at = _app()
+    assert any("資料存放：線上資料庫" in c.value for c in at.caption)
+    _signup(at, "online-club")
+    _open(at, "tasks")
+    _input(at, "事項").input("寄贊助信")
+    next(b for b in at.button if b.label == "新增").click().run()
+    assert not at.exception
+    assert [r["data"]["title"] for r in client.tables["club_docs"] if r["collection"] == "tasks"] == ["寄贊助信"]
+
+    at = _app()  # 重新開啟網頁（例如主機重新啟動），資料還在線上資料庫
+    at.text_input[0].input("online-club")
+    at.text_input[1].input("secret123")
+    at.button[0].click().run()
+    assert "測試攝影社" in _page_title(at)
+
+
+def test_tests_never_read_real_secrets():
+    at = _app()
+    assert any("資料存放：這台電腦" in c.value for c in at.caption)  # 就算 secrets.toml 有線上資料庫設定也不會用

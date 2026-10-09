@@ -32,7 +32,7 @@ from club_agent.departments import (  # noqa: E402
     FEATURE_VENUE,
     ClubSettings,
 )
-from club_agent.store import LocalClubStore, StoreError  # noqa: E402
+from club_agent.store import StoreError, create_store  # noqa: E402
 from club_agent.web.calendar_pages import calendar_page  # noqa: E402
 from club_agent.web.course_pages import course_tabs  # noqa: E402
 from club_agent.web.design_pages import design_tabs  # noqa: E402
@@ -64,16 +64,27 @@ inject_css()
 
 
 def secret(name: str, default: str | None = None) -> str | None:
-    try:
-        value = st.secrets.get(name)
-    except Exception:  # 本機沒有 secrets.toml 時
-        value = None
+    value = None
+    if not os.environ.get("CLUB_AGENT_TESTING"):  # 自動測試時不讀 secrets.toml，避免連到真正的資料庫或 AI
+        try:
+            value = st.secrets.get(name)
+        except Exception:  # 本機沒有 secrets.toml 時
+            value = None
     return value or os.environ.get(name, default)
 
 
 API_KEY = secret("GEMINI_API_KEY") or secret("GOOGLE_API_KEY")
 SIGNUP_CODE = secret("SIGNUP_CODE")  # 設定後，建立新社團帳號需要輸入這組邀請碼
-store = LocalClubStore(secret("CLUB_AGENT_DATA_DIR", str(ROOT / "data")))
+
+
+@st.cache_resource(show_spinner=False)
+def get_store(url: str | None, key: str | None, data_dir: str):
+    """所有使用者共用同一個儲存層（線上資料庫的暫存才會一致）；設定不同時（例如測試）各自建立。"""
+    return create_store({"SUPABASE_URL": url, "SUPABASE_KEY": key, "CLUB_AGENT_DATA_DIR": data_dir}.get, ROOT / "data")
+
+
+store = get_store(secret("SUPABASE_URL"), secret("SUPABASE_KEY"), secret("CLUB_AGENT_DATA_DIR", str(ROOT / "data")))
+ONLINE_DB = bool(secret("SUPABASE_URL") and secret("SUPABASE_KEY"))
 
 
 # ---------------------------------------------------------------------------
@@ -123,6 +134,7 @@ if "club_id" not in st.session_state:
                         st.rerun()
                     except StoreError as e:
                         st.error(str(e))
+        st.caption("資料存放：線上資料庫" if ONLINE_DB else "資料存放：這台電腦（data 資料夾）")
     st.stop()
 
 
