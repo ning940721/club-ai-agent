@@ -41,6 +41,7 @@ from club_agent.web.finance_pages import finance_page, finance_tabs, reimburse_p
 from club_agent.web.common_pages import (  # noqa: E402
     advisor_page,
     department_settings_form,
+    dept_task_strip,
     feed_page,
     help_page,
     profile_form,
@@ -55,7 +56,7 @@ from club_agent.web.member_pages import handover_pack_page, member_tabs  # noqa:
 from club_agent.web.pr_pages import pr_tabs  # noqa: E402
 from club_agent.web.president_pages import president_page  # noqa: E402
 from club_agent.web.speaker_pages import speaker_tabs  # noqa: E402
-from club_agent.web.venue_pages import venue_page, venue_tabs  # noqa: E402
+from club_agent.web.venue_pages import booking_page, venue_tabs  # noqa: E402
 
 
 st.set_page_config(page_title="社團營運平台", page_icon=":material/groups:", layout="wide")
@@ -198,6 +199,7 @@ if (side_page := st.session_state.get("side_page")) in SIDE_PAGES:
 page_header(ctx.dept_name, club.name, beta=ctx.dept.beta)
 if not API_KEY:
     st.error("網站尚未設定 GEMINI_API_KEY，請管理者到 Secrets 設定（見 docs/deploy.md）。")
+dept_task_strip(ctx, lambda: open_side_page("tasks"))  # 每個部門一進來就看到自己的待辦
 
 # 各部門的功能直接列在上方分頁；部門顧問放最後。待辦、AI Agent 問答、行事曆、報帳在側邊欄「幹部共用」。
 # 有些部門的功能需要先在分頁上方選擇對象（例如活動），所以先取得分頁清單（會先畫出上方的選單），再建立分頁。
@@ -211,8 +213,8 @@ MODULE_TABS: dict[str, Callable[[], list[tuple[str, Callable[[], None]]]]] = {
     FEATURE_PR: lambda: pr_tabs(ctx),
     FEATURE_SPEAKERS: lambda: speaker_tabs(ctx),
     FEATURE_COURSES: lambda: course_tabs(ctx),
-    # 社長同時管很多事，場地與器材收在一個分頁；其他負責總務的部門展開成多個分頁
-    FEATURE_VENUE: lambda: [("場地與器材", lambda: venue_page(ctx))] if FEATURE_PRESIDENT in features else venue_tabs(ctx),
+    # 社長只看場地申請（器材由總務管理）；負責總務的部門有場地申請、器材借還、器材清單
+    FEATURE_VENUE: lambda: [("場地申請", lambda: booking_page(ctx))] if FEATURE_PRESIDENT in features else venue_tabs(ctx),
     FEATURE_MEMBERS: lambda: member_tabs(ctx),
     # 財務是部門唯一的功能時展開成多個分頁；部門還有其他功能（例如社長）時收在一個「財務管理」分頁
     FEATURE_FINANCE: lambda: finance_tabs(ctx) if len(features) == 1 else [("財務管理", lambda: finance_page(ctx))],

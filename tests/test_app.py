@@ -671,8 +671,8 @@ def test_president_venue_and_handover_pack():
     at = _app()
     _signup(at)
     labels = [t.label for t in at.tabs]
-    assert labels[:2] == ["社團總覽", "財務管理"] and "場地與器材" in labels and labels[-2:] == ["交接資料包", "部門顧問"]
-    assert "場地申請（0 待申請）" in labels  # 場地與器材分頁裡的小分頁
+    assert labels == ["社團總覽", "財務管理", "場地申請", "交接資料包", "部門顧問"]  # 社長不管器材
+    assert not any("器材" in label for label in labels)
     store = LocalClubStore(os.environ["CLUB_AGENT_DATA_DIR"])
     save_member(store, at.session_state.club_id, Member(name="王小明", contact="0912-345-678"))
     _button(at, "使用基本議程（不使用 AI）").click().run()
@@ -685,3 +685,26 @@ def test_president_venue_and_handover_pack():
     assert any(n.endswith("00_資料包說明.docx") for n in names)
     assert any("03_各部門/社長/分享的成果/" in n for n in names) and any(n.endswith("10_人資/社員名單.xlsx") for n in names)
     assert not any("11_財務" in n for n in names)  # 沒有財務密碼就不包含財務
+
+
+
+def test_each_department_sees_its_own_tasks():
+    from club_agent.store import LocalClubStore
+    from club_agent.tasks import Task, save_task
+
+    at = _app()
+    _signup(at)
+    store = LocalClubStore(os.environ["CLUB_AGENT_DATA_DIR"])
+    save_task(store, at.session_state.club_id, Task(title="寄贊助信", department="pr", due="2020-01-01"))
+    save_task(store, at.session_state.club_id, Task(title="做海報", department="marketing"))
+    _switch(at, "pr")
+    # 有圖示的可展開區塊在 AppTest 裡是 Status 元素，用標題找
+    strip = next(c for c in at.main.children.values() if str(getattr(c, "label", "")).startswith("本部門待辦"))
+    assert strip.label == "本部門待辦：1 項未完成，1 項逾期"
+    assert any("寄贊助信" in m.value for m in strip.markdown) and not any("做海報" in m.value for m in strip.markdown)
+    _button(at, "到「待辦與進度」新增或更新").click().run()
+    assert "待辦與進度" in _page_title(at)
+    view = at.selectbox(key="todo_view_pr")
+    assert view.label == "查看哪個部門的待辦" and view.value == "pr"
+    _switch(at, "events")
+    assert any("活動目前沒有未完成的待辦" in c.value for c in at.caption)

@@ -227,12 +227,38 @@ def tasks_page(ctx: AppContext) -> None:
     """全社團共用的待辦（側邊欄「幹部共用」）：每位幹部都可以新增、更新；預設只看自己部門。"""
     st.caption("全社團共用的待辦清單，每位幹部都可以新增與更新進度；社長總覽會彙整各部門的進度。")
     add_task_form(ctx, "shared", department=None, default_department=ctx.dept_key)
-    c1, c2 = st.columns([2, 1], vertical_alignment="center")
-    scope = c1.segmented_control("顯示", [f"{ctx.dept_name}", "全部部門"], default=ctx.dept_name, key=f"todo_scope_{ctx.dept_key}")
+    c1, c2 = st.columns([2, 1], vertical_alignment="bottom")
+    options = [*ctx.settings.enabled_keys(), ALL_DEPARTMENTS]
+    view = c1.selectbox("查看哪個部門的待辦", options, index=options.index(ctx.dept_key), key=f"todo_view_{ctx.dept_key}",
+                        format_func=lambda k: "全部部門" if k == ALL_DEPARTMENTS else ctx.settings.name(k))
     show_done = c2.toggle("顯示已完成", key="todo_show_done")
-    mine_only = scope != "全部部門"
-    tasks = list_tasks(ctx.store, ctx.club_id, ctx.dept_key if mine_only else None)
-    tasks_table(ctx, [t for t in tasks if show_done or t.status != "完成"], "shared", show_department=not mine_only)
+    show_all = view == ALL_DEPARTMENTS
+    tasks = list_tasks(ctx.store, ctx.club_id, None if show_all else view)
+    tasks_table(ctx, [t for t in tasks if show_done or t.status != "完成"], f"shared_{view}", show_department=show_all)
+
+
+ALL_DEPARTMENTS = "__all__"
+
+
+def dept_task_strip(ctx: AppContext, open_tasks_page) -> None:
+    """部門頁面上方的本部門待辦摘要：未完成與逾期數量，展開可看清單，按鈕可到待辦頁面新增或更新。"""
+    today = date.today()
+    tasks = [t for t in list_tasks(ctx.store, ctx.club_id, ctx.dept_key) if t.status != "完成"]
+    overdue = [t for t in tasks if t.is_overdue(today)]
+    if not tasks:
+        st.caption(f"{ctx.dept_name}目前沒有未完成的待辦。")
+        return
+    title = f"本部門待辦：{len(tasks)} 項未完成" + (f"，{len(overdue)} 項逾期" if overdue else "")
+    with st.expander(title, expanded=bool(overdue), icon=":material/checklist:"):
+        for t in tasks[:10]:
+            late = "　:red[逾期]" if t.is_overdue(today) else ""
+            due = f"｜期限 {t.due}" if t.due else ""
+            owner = f"｜{t.owner}" if t.owner else ""
+            st.markdown(f"- **{t.status}**　{t.title}{owner}{due}{late}")
+        if len(tasks) > 10:
+            st.caption(f"還有 {len(tasks) - 10} 項")
+        st.button("到「待辦與進度」新增或更新", key="strip_open_tasks", on_click=open_tasks_page, type="tertiary",
+                  icon=":material/arrow_forward:")
 
 
 # ---------------------------------------------------------------------------
@@ -401,7 +427,7 @@ def help_page() -> None:
 1. 在左側選擇**我的部門**，上方會直接列出這個部門的功能，最後一個分頁是**部門顧問**：
    描述遇到的狀況，取得行動步驟與可直接使用的文件模板；想查社團的事（例如上次開會決定了什麼）請用左側的「AI Agent 問答」
 2. 各部門的專屬功能：
-   - 社長：社團總覽（各部門進度、會議時間表與議程、追蹤上次會議未決議的議題）；財務管理；場地與器材；交接資料包（一鍵整理全社團資料成 ZIP，可同時產生各部門交接手冊）
+   - 社長：社團總覽（各部門進度、會議時間表與議程、追蹤上次會議未決議的議題）；財務管理；場地申請；交接資料包（一鍵整理全社團資料成 ZIP，可同時產生各部門交接手冊）
    - 會議記錄：記錄問答、新增記錄（自動整理重點並對照會前議程）、所有記錄
    - 行銷：社群數據診斷、月報與趨勢、設計需求（登記各部門的海報與貼文需求，AI 寫設計說明與文案）、視覺規範
    - 活動：先在上方選擇活動，再使用活動總覽、企劃書、籌備清單（自動成為各部門待辦）、細流與工作人員（含名牌 PDF）、回饋表單、成果報告
@@ -412,7 +438,7 @@ def help_page() -> None:
    - 講者：講座總覽、新增講座、信件與通知、講座彙整
    - 財務（社長也看得到）：輸入財務密碼後，有報帳審核、收支帳簿、預算、財務報表（Excel／Word／PDF）、規範與設定
 3. **幹部共用**（左側選單）：全體幹部都會用到的功能，點選後主畫面會切換過去，按「返回部門功能」回來
-   - 待辦與進度：每位幹部都可以新增、更新任務；預設只顯示自己部門，可以切換看全部
+   - 待辦與進度：每位幹部都可以新增、更新任務；預設顯示自己部門，可以選擇查看其他部門或全部部門。每個部門頁面最上方也會顯示本部門的待辦
    - AI Agent 問答：上方可以直接提問（例：下次發文時間是什麼時候？），AI 會從各部門分享的成果、會議記錄、待辦與行事曆找答案；下方列出各部門分享的成果，產生結果時可以選擇要不要分享
    - 行事曆：幹部會議、活動、講座、會議記錄提到的日期、待辦與追蹤期限、各部門新增的行程；可以匯出到 Google 日曆
    - 報帳申請：申請報帳並用報帳編號查詢進度；單據正本請交給財務
