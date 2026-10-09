@@ -1,4 +1,4 @@
-"""人資／社員：社員名單、招生與面試（AI 面試題目）、幹部交接手冊（AI 整理部門紀錄）。"""
+"""人資／社員：社員名單、招生與面試（AI 面試題目）；社長的交接資料包（可同時用 AI 整理各部門交接手冊）。"""
 
 from __future__ import annotations
 
@@ -56,7 +56,6 @@ def member_tabs(ctx: AppContext) -> list[tuple[str, Callable[[], None]]]:
     return [
         (f"社員名單（{sum(m.status == '在籍' for m in members)}）", lambda: roster_tab(ctx, members)),
         (f"招生與面試（{len(applicants)}）", lambda: recruiting_tab(ctx, applicants, members)),
-        ("交接手冊", lambda: handover_tab(ctx)),
     ]
 
 
@@ -250,7 +249,7 @@ def recruiting_tab(ctx: AppContext, applicants: list[Applicant], members: list[M
 
 
 # ---------------------------------------------------------------------------
-# 交接手冊
+# 交接資料包（社長）
 # ---------------------------------------------------------------------------
 
 
@@ -280,37 +279,6 @@ def handover_digest(ctx: AppContext, dept_key: str) -> str:
         lines.append("\n[行事曆]")
         lines += [f"- {e.date}｜{e.kind}｜{e.title}" for e in events[-60:]]
     return "\n".join(lines)
-
-
-def handover_tab(ctx: AppContext) -> None:
-    st.caption("選擇部門，AI 會從這個部門的待辦、分享的成果、會議決議與行事曆整理交接手冊，讓下一屆快速上手。"
-               "紀錄越完整，手冊越具體；帳號密碼不會寫進手冊。")
-    keys = ctx.settings.enabled_keys()
-    c1, c2 = st.columns([1, 2])
-    dept_key = c1.selectbox("部門", keys, format_func=ctx.settings.name, key="handover_dept")
-    extra = c2.text_input("想補充的經驗（選填）", key="handover_extra", placeholder="例：成果展場地要在兩個月前借；廠商 A 很好合作")
-    col_btn, col_share = st.columns([1, 3], vertical_alignment="center")
-    clicked = col_btn.button("產生交接手冊", type="primary", key="handover_go")
-    with col_share:
-        share = ctx.share_toggle("handover")
-    if clicked:
-        name = ctx.settings.name(dept_key)
-        digest = handover_digest(ctx, dept_key)
-        manual = ctx.run_ai("整理交接手冊中…", lambda llm, _s: PeopleAdvisor(llm).handover(ctx.club, name, digest, extra))
-        if manual:
-            md = handover_markdown(ctx.club.name, name, manual)
-            st.session_state.handover_md = (dept_key, md)
-            ctx.keep_result("handover", "handover", f"{name}交接手冊", manual.overview[:150], md, share, dept_key)
-    if (saved := st.session_state.get("handover_md")) and saved[0] == dept_key:
-        st.divider()
-        st.markdown(saved[1])
-        download_buttons(saved[1], f"{ctx.settings.name(dept_key)}交接手冊", f"handover_{dept_key}")
-        ctx.share_controls("handover")
-
-
-# ---------------------------------------------------------------------------
-# 交接資料包（社長）
-# ---------------------------------------------------------------------------
 
 
 def handover_pack_page(ctx: AppContext) -> None:

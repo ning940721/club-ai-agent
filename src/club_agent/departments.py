@@ -27,7 +27,7 @@ FEATURE_FINANCE = "finance_tools"  # 財務管理（以財務密碼上鎖，財�
 FEATURE_DESIGN = "design_tools"  # 美宣：設計需求單、視覺規範（併入行銷）
 FEATURE_COURSES = "course_tools"  # 社課：學期課表、出席與回饋
 FEATURE_VENUE = "venue_tools"  # 總務：場地申請時程、器材清單與借還
-FEATURE_MEMBERS = "member_tools"  # 人資：社員名單、招生與面試、交接手冊
+FEATURE_MEMBERS = "member_tools"  # 人資：社員名單、招生與面試
 
 # 社團可以分配給部門的功能模組（設定頁的選項，依顯示順序）
 FEATURES: dict[str, tuple[str, str]] = {
@@ -40,7 +40,7 @@ FEATURES: dict[str, tuple[str, str]] = {
     FEATURE_SPEAKERS: ("講座管理", "講者邀約、時間敲定、信件與通知"),
     FEATURE_COURSES: ("社課", "AI 規劃學期課表、出席與回饋"),
     FEATURE_VENUE: ("場地與器材", "場地申請時程提醒、器材清單與借還"),
-    FEATURE_MEMBERS: ("社員與交接", "社員名單、招生與面試、AI 交接手冊"),
+    FEATURE_MEMBERS: ("社員與招生", "社員名單、招生與面試"),
     FEATURE_FINANCE: ("財務管理", "報帳審核、帳簿、預算、報表（財務密碼上鎖）"),
 }
 LEGACY_NAMES = {"design": "美宣"}  # 已併入行銷的舊部門，舊紀錄仍顯示原名稱
