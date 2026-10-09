@@ -68,6 +68,14 @@ def venue_tabs(ctx: AppContext) -> list[tuple[str, Callable[[], None]]]:
     ]
 
 
+def venue_page(ctx: AppContext) -> None:
+    """社長的「場地與器材」分頁：場地申請、器材借還、器材清單收在同一個分頁裡。"""
+    tabs = venue_tabs(ctx)
+    for tab, (_, render) in zip(st.tabs([name for name, _ in tabs]), tabs):
+        with tab:
+            render()
+
+
 # ---------------------------------------------------------------------------
 # 場地申請
 # ---------------------------------------------------------------------------

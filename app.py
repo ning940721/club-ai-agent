@@ -35,7 +35,7 @@ from club_agent.departments import (  # noqa: E402
 from club_agent.store import LocalClubStore, StoreError  # noqa: E402
 from club_agent.web.calendar_pages import calendar_page  # noqa: E402
 from club_agent.web.course_pages import course_tabs  # noqa: E402
-from club_agent.web.design_pages import design_request_page, design_tabs  # noqa: E402
+from club_agent.web.design_pages import design_tabs  # noqa: E402
 from club_agent.web.event_pages import event_tabs  # noqa: E402
 from club_agent.web.finance_pages import finance_page, finance_tabs, reimburse_page  # noqa: E402
 from club_agent.web.common_pages import (  # noqa: E402
@@ -51,11 +51,11 @@ from club_agent.web.context import AppContext  # noqa: E402
 from club_agent.web.style import inject_css, page_header, sidebar_brand  # noqa: E402
 from club_agent.web.marketing_pages import diagnosis_page, monthly_page  # noqa: E402
 from club_agent.web.meeting_pages import meeting_tabs  # noqa: E402
-from club_agent.web.member_pages import member_tabs  # noqa: E402
+from club_agent.web.member_pages import handover_pack_page, member_tabs  # noqa: E402
 from club_agent.web.pr_pages import pr_tabs  # noqa: E402
 from club_agent.web.president_pages import president_page  # noqa: E402
 from club_agent.web.speaker_pages import speaker_tabs  # noqa: E402
-from club_agent.web.venue_pages import venue_tabs  # noqa: E402
+from club_agent.web.venue_pages import venue_page, venue_tabs  # noqa: E402
 
 
 st.set_page_config(page_title="社團營運平台", page_icon=":material/groups:", layout="wide")
@@ -142,7 +142,6 @@ SHARED_PAGES = {
     "feed": ("AI Agent 問答", ":material/smart_toy:", feed_page),
     "calendar": ("行事曆", ":material/calendar_month:", calendar_page),
     "reimburse": ("報帳申請", ":material/receipt_long:", reimburse_page),
-    "design": ("設計需求", ":material/palette:", design_request_page),
 }
 OTHER_PAGES = {
     "settings": ("社團設定", ":material/settings:", settings_page),
@@ -212,7 +211,8 @@ MODULE_TABS: dict[str, Callable[[], list[tuple[str, Callable[[], None]]]]] = {
     FEATURE_PR: lambda: pr_tabs(ctx),
     FEATURE_SPEAKERS: lambda: speaker_tabs(ctx),
     FEATURE_COURSES: lambda: course_tabs(ctx),
-    FEATURE_VENUE: lambda: venue_tabs(ctx),
+    # 社長同時管很多事，場地與器材收在一個分頁；其他負責總務的部門展開成多個分頁
+    FEATURE_VENUE: lambda: [("場地與器材", lambda: venue_page(ctx))] if FEATURE_PRESIDENT in features else venue_tabs(ctx),
     FEATURE_MEMBERS: lambda: member_tabs(ctx),
     # 財務是部門唯一的功能時展開成多個分頁；部門還有其他功能（例如社長）時收在一個「財務管理」分頁
     FEATURE_FINANCE: lambda: finance_tabs(ctx) if len(features) == 1 else [("財務管理", lambda: finance_page(ctx))],
@@ -221,6 +221,8 @@ pages: list[tuple[str, Callable[[], None]]] = []
 for feature in features:
     if feature in MODULE_TABS:
         pages += MODULE_TABS[feature]()
+if FEATURE_PRESIDENT in features:
+    pages.append(("交接資料包", lambda: handover_pack_page(ctx)))
 pages.append(("部門顧問", lambda: advisor_page(ctx)))
 
 for tab, (_, render) in zip(st.tabs([name for name, _ in pages]), pages):

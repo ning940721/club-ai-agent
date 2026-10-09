@@ -306,3 +306,52 @@ def handover_tab(ctx: AppContext) -> None:
         st.markdown(saved[1])
         download_buttons(saved[1], f"{ctx.settings.name(dept_key)}交接手冊", f"handover_{dept_key}")
         ctx.share_controls("handover")
+
+
+# ---------------------------------------------------------------------------
+# 交接資料包（社長）
+# ---------------------------------------------------------------------------
+
+
+def handover_pack_page(ctx: AppContext) -> None:
+    """整理全社團各部門的資料成一個 ZIP（Word／Excel／行事曆），可選擇同時用 AI 產生各部門交接手冊。"""
+    from ..handover_export import build_handover_zip
+
+    st.caption("把全社團的資料整理成一個 ZIP：待辦、行事曆、會議記錄、各部門分享的成果、活動企劃與成果報告、講座、合作對象、"
+               "行銷數據與設計、社課、器材、社員名單等，依部門分資料夾，用 Word／Excel 就能打開。適合學期末交接或備份。")
+    finance_open = st.session_state.get("finance_unlocked") == ctx.club_id
+    c1, c2 = st.columns(2)
+    include_finance = c1.checkbox("包含財務資料（學期報表、報帳規範）", value=False, disabled=not finance_open, key="pack_finance",
+                                  help=None if finance_open else "請先到「財務管理」輸入財務密碼")
+    include_contacts = c2.checkbox("包含社員聯絡方式（個資，請小心保管）", value=False, key="pack_contacts")
+    if not finance_open:
+        st.caption("財務資料需要先在「財務管理」輸入財務密碼才能包含。")
+    with_manuals = st.checkbox("同時用 AI 產生各部門的交接手冊", value=False, key="pack_manuals",
+                               help="每個部門呼叫一次 AI，部門多時需要幾分鐘")
+    chosen: list[str] = []
+    if with_manuals:
+        keys = ctx.settings.enabled_keys()
+        chosen = st.multiselect("要產生交接手冊的部門", keys, default=keys, format_func=ctx.settings.name, key="pack_depts")
+        remaining = ctx.max_runs - st.session_state.get("runs", 0)
+        if len(chosen) > remaining:
+            st.warning(f"這次登入只剩 {remaining} 次 AI 使用額度，請減少部門數量，或重新整理頁面後再試。")
+    if st.button("整理交接資料包", type="primary", key="pack_go"):
+        manuals = {}
+        for key in chosen:
+            name = ctx.settings.name(key)
+            digest = handover_digest(ctx, key)
+            manual = ctx.run_ai(f"整理{name}交接手冊中…", lambda llm, _s, n=name, d=digest: PeopleAdvisor(llm).handover(ctx.club, n, d))
+            if manual:
+                manuals[key] = handover_markdown(ctx.club.name, name, manual)
+        with st.spinner("整理檔案中…"):
+            data, files = build_handover_zip(ctx.store, ctx.club_id, ctx.club, ctx.settings, include_finance=include_finance,
+                                             include_contacts=include_contacts, manuals=manuals)
+        st.session_state.handover_zip = (data, files, f"{ctx.club.name}_交接資料_{date.today():%Y%m%d}.zip")
+    if saved := st.session_state.get("handover_zip"):
+        data, files, filename = saved
+        st.success(f"已整理 {len(files)} 個檔案（{len(data) / 1024:,.0f} KB）")
+        st.download_button("下載交接資料包（ZIP）", data, file_name=filename, mime="application/zip", type="primary",
+                           icon=":material/folder_zip:", on_click="ignore", key="pack_download")
+        with st.expander("資料包裡有哪些檔案"):
+            root = files[0].split("/")[0] if files else ""
+            st.text("\n".join(f.removeprefix(root + "/") for f in files))

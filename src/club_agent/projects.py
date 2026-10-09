@@ -220,7 +220,8 @@ def google_form_text(form: FeedbackForm) -> str:
     return "\n".join(lines)
 
 
-def report_markdown(club_name: str, p: EventProject, spent: int, spent_by_category: dict[str, int]) -> str:
+def report_markdown(club_name: str, p: EventProject, spent: int | None, spent_by_category: dict[str, int]) -> str:
+    """spent 為 None 表示沒有財務資料（例如交接資料包未包含財務），經費執行只列預算。"""
     r = p.report
     if r is None:
         return f"# {p.name} 成果報告\n\n（尚未產生）\n"
@@ -234,7 +235,7 @@ def report_markdown(club_name: str, p: EventProject, spent: int, spent_by_catego
         "## 活動亮點", *[f"- {x}" for x in r.highlights], "",
         "## 經費執行",
         "| 預算 | 實際支出（已核准報帳） | 差額 |", "|---|---|---|",
-        f"| {planned:,} | {spent:,} | {planned - spent:+,} |", "",
+        f"| {planned:,} | {spent:,} | {planned - spent:+,} |" if spent is not None else f"| {planned:,} | 未包含財務資料 | — |", "",
     ]
     if spent_by_category:
         out += ["| 類別 | 實際支出 |", "|---|---|", *[f"| {c} | {a:,} |" for c, a in spent_by_category.items()], ""]

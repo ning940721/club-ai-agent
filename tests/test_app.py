@@ -99,7 +99,7 @@ def test_signup_lands_on_president_overview():
     _button(at, "產生進度彙整與議程").click().run()
     assert not at.exception
     assert any("各部門進度正常" in m.value for m in at.markdown)
-    schedule = at.dataframe[-1].value
+    schedule = next(d.value for d in at.dataframe if "議題" in d.value.columns and "時間" in d.value.columns)
     assert schedule.loc[0, "時間"] == "19:00–19:20" and schedule.loc[0, "議題"] == "贊助進度"
     assert any("比預定時長少 70 分鐘" in c.value for c in at.caption)
 
@@ -110,7 +110,7 @@ def test_meeting_duration_is_remembered_and_template_agenda_needs_no_ai():
     at.number_input(key="mt_minutes").set_value(60).run()
     _button(at, "使用基本議程（不使用 AI）").click().run()
     assert not at.exception
-    schedule = at.dataframe[-1].value
+    schedule = next(d.value for d in at.dataframe if "議題" in d.value.columns and "時間" in d.value.columns)
     assert schedule["分鐘"].sum() == 60 and schedule.loc[0, "時間"].startswith("19:00")
     assert any("剛好符合預定時長" in c.value for c in at.caption)
     at2 = _app()  # 重新整理後仍記得會議時長
@@ -576,14 +576,11 @@ def test_design_request_flow(monkeypatch):
         brief if output_type is DesignBrief else original(self, system, user, output_type)))
     at = _app()
     _signup(at)
-    _switch(at, "events")
-    _open(at, "design")  # 活動部提出需求
+    _switch(at, "marketing")  # 行銷登記其他部門的需求
+    assert "design" not in [b.key.removeprefix("side_") for b in at.button if b.key and b.key.startswith("side_")]
     _input(at, "需求名稱＊").input("成果展海報")
-    _button(at, "送出需求").click().run()
-    assert any("已送出「成果展海報」" in s.value for s in at.success)
-    assert any("**待接單**　成果展海報" in m.value for m in at.markdown)
-
-    _switch(at, "marketing")  # 行銷接單
+    _button(at, "新增需求").click().run()
+    assert any("已新增「成果展海報」" in s.value for s in at.success)
     assert "設計需求（1）" in [t.label for t in at.tabs]
     _button(at, "AI 產生設計說明與文案").click().run()
     assert not at.exception
@@ -661,3 +658,30 @@ def test_members_recruiting_and_handover(monkeypatch):
     _button(at, "產生交接手冊").click().run()
     assert not at.exception
     assert any("公關部交接" in m.value or "提早聯絡" in m.value for m in at.markdown)
+
+
+
+def test_president_venue_and_handover_pack():
+    import io
+    import zipfile
+
+    from club_agent.members import Member, save_member
+    from club_agent.store import LocalClubStore
+
+    at = _app()
+    _signup(at)
+    labels = [t.label for t in at.tabs]
+    assert labels[:2] == ["社團總覽", "財務管理"] and "場地與器材" in labels and labels[-2:] == ["交接資料包", "部門顧問"]
+    assert "場地申請（0 待申請）" in labels  # 場地與器材分頁裡的小分頁
+    store = LocalClubStore(os.environ["CLUB_AGENT_DATA_DIR"])
+    save_member(store, at.session_state.club_id, Member(name="王小明", contact="0912-345-678"))
+    _button(at, "使用基本議程（不使用 AI）").click().run()
+    at.button(key="share_btn_brief").click().run()  # 分享一份成果
+    _button(at, "整理交接資料包").click().run()
+    assert not at.exception
+    assert any("已整理" in s.value for s in at.success)
+    data = at.session_state.handover_zip[0]
+    names = zipfile.ZipFile(io.BytesIO(data)).namelist()
+    assert any(n.endswith("00_資料包說明.docx") for n in names)
+    assert any("03_各部門/社長/分享的成果/" in n for n in names) and any(n.endswith("10_人資/社員名單.xlsx") for n in names)
+    assert not any("11_財務" in n for n in names)  # 沒有財務密碼就不包含財務

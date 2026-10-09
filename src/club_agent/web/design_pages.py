@@ -1,4 +1,4 @@
-"""美宣（併入行銷）：側邊欄「設計需求」（各部門提出），行銷的「設計需求」與「視覺規範」分頁。"""
+"""美宣（併入行銷）：行銷的「設計需求」（登記各部門的需求、AI 設計說明）與「視覺規範」分頁。"""
 
 from __future__ import annotations
 
@@ -47,45 +47,36 @@ def _events(ctx: AppContext) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# 側邊欄：各部門提出設計需求
+# 新增設計需求（行銷部直接登記，可選擇提出的部門）
 # ---------------------------------------------------------------------------
 
 
-def design_request_page(ctx: AppContext) -> None:
-    _show_flash()
-    st.caption("需要海報、貼文圖、限動或簡報時在這裡提出，行銷（美宣）會依截止日排程處理。截止日會出現在行事曆。")
+def request_form(ctx: AppContext) -> None:
     with st.form("design_new", clear_on_submit=True):
         c1, c2, c3 = st.columns([3, 2, 2])
         title = c1.text_input("需求名稱＊", placeholder="例：成果展主視覺海報")
         kind = c2.selectbox("類型", list(SIZE_PRESETS))
         due = c3.date_input("需要完成的日期", value=None)
-        c4, c5, c6 = st.columns(3)
-        requester = c4.text_input("聯絡人", placeholder="有問題時找誰")
-        size = c5.text_input("尺寸（空白則依類型）", placeholder="例：A3、1080 × 1350 px")
+        c4, c5, c6, c7 = st.columns(4)
+        departments = ctx.settings.enabled_keys()
+        department = c4.selectbox("提出的部門", departments, index=departments.index(ctx.dept_key), format_func=ctx.settings.name)
+        requester = c5.text_input("聯絡人", placeholder="有問題時找誰")
+        size = c6.text_input("尺寸（空白則依類型）", placeholder="例：A3、1080 × 1350 px")
         events = ["", *_events(ctx)]
-        event = c6.selectbox("相關活動", events, format_func=lambda e: e or "（無）")
+        event = c7.selectbox("相關活動", events, format_func=lambda e: e or "（無）")
         purpose = st.text_area("用途與想傳達的重點", height=80, placeholder="例：吸引非社員來看展，強調免費入場與底片體驗")
         copy_text = st.text_area("一定要放的文字", height=80, placeholder="例：活動名稱、日期時間、地點、報名 QR code")
         references = st.text_input("參考圖或連結（選填）")
-        if st.form_submit_button("送出需求", type="primary"):
+        if st.form_submit_button("新增需求", type="primary"):
             if not title.strip():
                 st.warning("請填寫需求名稱")
             else:
                 save_request(ctx.store, ctx.club_id, DesignRequest(
-                    title=title.strip(), department=ctx.dept_key, requester=requester.strip(), kind=kind,
+                    title=title.strip(), department=department, requester=requester.strip(), kind=kind,
                     size=size.strip() or SIZE_PRESETS[kind], purpose=purpose.strip(), copy_text=copy_text.strip(),
                     references=references.strip(), event=event, due=due.isoformat() if due else "",
                 ))
-                _flash(f"已送出「{title.strip()}」，行銷會在「設計需求」看到")
-
-    mine = [r for r in list_requests(ctx.store, ctx.club_id) if r.department == ctx.dept_key]
-    st.markdown(f"**{ctx.dept_name}提出的需求（{len(mine)}）**")
-    if not mine:
-        st.caption("還沒有提出過需求。")
-    for r in mine:
-        due = f"｜截止 {r.due}" if r.due else ""
-        designer = f"｜{r.designer}" if r.designer else ""
-        st.markdown(f"- **{r.status}**　{r.title}（{r.kind}）{due}{designer}")
+                _flash(f"已新增「{title.strip()}」" + (f"，截止日 {due.isoformat()} 已加入行事曆" if due else ""))
 
 
 # ---------------------------------------------------------------------------
@@ -102,7 +93,9 @@ def design_tabs(ctx: AppContext) -> list[tuple[str, Callable[[], None]]]:
 
 def queue_tab(ctx: AppContext, requests: list[DesignRequest]) -> None:
     today = date.today()
-    st.caption("各部門在左側「設計需求」提出的需求，依截止日排序。也可以請 AI 依視覺規範寫出設計說明與文案。")
+    st.caption("各部門的海報、貼文圖、限動等設計需求，依截止日排序。其他部門有需求時，由行銷在這裡登記；也可以請 AI 依視覺規範寫出設計說明與文案。")
+    with st.expander("新增設計需求", expanded=not requests):
+        request_form(ctx)
     overdue = [r for r in requests if r.is_overdue(today)]
     for r in overdue:
         st.warning(f"已超過截止日：{r.title}（{ctx.settings.name(r.department)}，截止 {r.due}）")

@@ -72,7 +72,7 @@ DEPARTMENTS: dict[str, Department] = {
             focus=("各部門進度掌握", "會議議程規劃", "組織分工與決策", "社團年度規劃"),
             example_questions=("幹部之間分工不清楚，要怎麼重新安排？", "這學期的社團目標要怎麼訂？"),
             details_hint="例：幹部會每兩週一次；重大決策需幹部會過半同意；本學期目標是招到 40 位新社員",
-            features=(FEATURE_PRESIDENT, FEATURE_FINANCE),
+            features=(FEATURE_PRESIDENT, FEATURE_FINANCE, FEATURE_VENUE),
         ),
         Department(
             key="marketing",
