@@ -32,7 +32,7 @@ def test_confirm_sorting_and_follow_up(tmp_path, club):
 
     events = {e.title: e for e in club_events(store, cid, ClubSettings.default())}
     talk_event = events["講座：底片沖洗（陳老師）"]
-    assert (talk_event.date, talk_event.time, talk_event.department) == ("2026-10-30", "19:00", "speakers")
+    assert (talk_event.date, talk_event.time, talk_event.department) == ("2026-10-30", "19:00", "courses")
     assert events["追蹤講者：王小明（洽談中）"].kind == "截止"
 
 

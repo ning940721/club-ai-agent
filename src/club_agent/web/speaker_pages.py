@@ -204,8 +204,8 @@ def letters_section(ctx: AppContext, talks: list[Talk]) -> None:
         _flash(f"已存到「{talk.title()}」的往來紀錄" + ("，進度改為已邀請" if updated.stage != talk.stage else ""))
 
     letter_workbench(
-        ctx, f"talk_{talk.id}", LETTER_KINDS, talk.facts(), talk.contact, ctx.settings.name("speakers"), on_save,
-        notice_kinds=("社員宣傳通知",), download_name=talk.speaker, department="speakers",
+        ctx, f"talk_{talk.id}", LETTER_KINDS, talk.facts(), talk.contact, ctx.dept_name, on_save,
+        notice_kinds=("社員宣傳通知",), download_name=talk.speaker, department=ctx.dept_key,
     )
 
 

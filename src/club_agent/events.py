@@ -122,7 +122,7 @@ def club_events(store, club_id: str, settings: ClubSettings | None = None) -> li
             events.append(
                 CalendarEvent(
                     id=f"talk-{talk.id}", date=talk.confirmed.date, title=f"講座：{talk.topic}（{talk.speaker}）",
-                    time=talk.confirmed.start, end=talk.confirmed.end, kind="活動", department="speakers",
+                    time=talk.confirmed.start, end=talk.confirmed.end, kind="活動", department="courses",
                     location=talk.location, note=talk.format, source=SOURCE_TALK,
                 )
             )
@@ -130,7 +130,7 @@ def club_events(store, club_id: str, settings: ClubSettings | None = None) -> li
             events.append(
                 CalendarEvent(
                     id=f"talk-follow-{talk.id}", date=talk.follow_up, title=f"追蹤講者：{talk.speaker}（{talk.stage}）",
-                    kind="截止", department="speakers", note=talk.topic, source=SOURCE_TALK,
+                    kind="截止", department="courses", note=talk.topic, source=SOURCE_TALK,
                 )
             )
 

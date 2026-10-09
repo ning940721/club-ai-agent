@@ -18,7 +18,7 @@ def make_advice() -> Advice:
 
 
 def test_departments_defined():
-    assert list(DEPARTMENTS) == ["president", "marketing", "pr", "finance", "events", "minutes", "courses", "speakers", "venue", "members"]
+    assert list(DEPARTMENTS) == ["president", "marketing", "pr", "finance", "events", "minutes", "courses", "venue", "members"]
     assert not get_department("marketing").beta
     assert all(d.beta for k, d in DEPARTMENTS.items() if k != "marketing")
     assert get_department("finance").label.endswith("（測試版）")
@@ -90,3 +90,25 @@ def test_features_reassigned_and_custom_department():
     assert s.name("design") == "美宣"  # 已併入行銷的舊部門
     assert department_retriever(key).chunks  # 自訂部門使用共用知識庫
     assert any("design.md" == c.source for c in department_retriever("marketing").chunks)  # 美宣知識併入行銷
+
+
+
+def test_legacy_speakers_department_merges_into_courses():
+    from club_agent.departments import FEATURE_COURSES, FEATURE_SPEAKERS, ClubSettings
+    from club_agent.store import Record
+    from club_agent.tasks import Task
+
+    old = ClubSettings.model_validate({"departments": {
+        "president": {"enabled": True},
+        "speakers": {"enabled": True, "details": "每學期 3 場講座"},
+        "courses": {"enabled": False, "details": "社課週四"},
+    }})
+    assert "speakers" not in old.departments and "courses" in old.enabled_keys()
+    assert old.details("courses") == "社課週四\n每學期 3 場講座"
+    assert old.features("courses") == (FEATURE_COURSES, FEATURE_SPEAKERS)
+    custom = ClubSettings.model_validate({"departments": {
+        "speakers": {"enabled": True}, "courses": {"enabled": True, "features": [FEATURE_COURSES]}}})
+    assert custom.features("courses") == (FEATURE_COURSES, FEATURE_SPEAKERS)  # 自訂過的分工也補上講座
+    assert old.name("speakers") == "課程與講座"
+    assert Task(title="邀請講者", department="speakers").department == "courses"
+    assert Record(department="speakers", kind="advice", title="x", summary="", markdown="").department == "courses"

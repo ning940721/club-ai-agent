@@ -12,7 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from .retriever import DEFAULT_KB_DIR, BM25Retriever, Chunk, split_markdown
 
@@ -37,13 +37,19 @@ FEATURES: dict[str, tuple[str, str]] = {
     FEATURE_DESIGN: ("美宣設計", "處理各部門的設計需求、視覺規範、AI 設計說明與文案"),
     FEATURE_EVENTS: ("活動專案", "企劃書、籌備清單、細流、回饋表單、成果報告"),
     FEATURE_PR: ("合作與贊助", "找贊助對象、合作對象、合作信件"),
-    FEATURE_SPEAKERS: ("講座管理", "講者邀約、時間敲定、信件與通知"),
     FEATURE_COURSES: ("社課", "AI 規劃學期課表、出席與回饋"),
+    FEATURE_SPEAKERS: ("講座管理", "講者邀約、時間敲定、信件與通知"),
     FEATURE_VENUE: ("場地與器材", "場地申請時程提醒、器材清單與借還"),
-    FEATURE_MEMBERS: ("社員與交接", "社員名單、招生與面試、AI 交接手冊"),
+    FEATURE_MEMBERS: ("社員與招募", "社員名單、招生與面試"),
     FEATURE_FINANCE: ("財務管理", "報帳審核、帳簿、預算、報表（財務密碼上鎖）"),
 }
 LEGACY_NAMES = {"design": "美宣"}  # 已併入行銷的舊部門，舊紀錄仍顯示原名稱
+# 已合併的部門：舊代號的資料（待辦、紀錄、設定）一律歸到新部門
+DEPARTMENT_ALIASES = {"speakers": "courses"}
+
+
+def canonical_department(key: str) -> str:
+    return DEPARTMENT_ALIASES.get(key, key)
 
 
 @dataclass(frozen=True)
@@ -122,21 +128,12 @@ DEPARTMENTS: dict[str, Department] = {
         ),
         Department(
             key="courses",
-            name="課程",
-            advisor_role="社課規劃與教學設計顧問",
-            focus=("學期社課規劃", "講師邀請", "課程內容與教案", "出席率與學習回饋"),
-            example_questions=("社課出席率越來越低，要怎麼提升？", "幫我規劃一學期 12 堂的初學者社課"),
-            details_hint="例：社課每週四晚上；講師費每堂 1,500 元；學員多為零基礎",
-            features=(FEATURE_COURSES,),
-        ),
-        Department(
-            key="speakers",
-            name="講者",
-            advisor_role="講座企劃與講者邀約顧問",
-            focus=("尋找與邀請講者", "講座主題與時間敲定", "講者聯繫與接待", "講座宣傳與社員通知"),
-            example_questions=("想找業界攝影師來分享，要去哪裡找、怎麼開口邀請？", "講者臨時說不能來，要怎麼應變？"),
-            details_hint="例：每學期辦 3 場講座；講師費 2,000 元＋交通費實報；講座固定在週四晚上，地點為社辦或學活中心",
-            features=(FEATURE_SPEAKERS,),
+            name="課程與講座",
+            advisor_role="社課規劃與講座企劃顧問",
+            focus=("學期社課規劃", "課程內容與教案", "出席率與學習回饋", "尋找與邀請講者", "講座時間敲定與宣傳"),
+            example_questions=("社課出席率越來越低，要怎麼提升？", "想找業界攝影師來分享，要去哪裡找、怎麼開口邀請？"),
+            details_hint="例：社課每週四晚上；講師費每堂 1,500 元；每學期辦 3 場講座；學員多為零基礎",
+            features=(FEATURE_COURSES, FEATURE_SPEAKERS),
         ),
         Department(
             key="venue",
@@ -163,6 +160,7 @@ DEPARTMENTS: dict[str, Department] = {
 DEFAULT_ENABLED = ("president", "marketing", "pr", "finance", "events", "minutes")
 
 DEPARTMENT_KB_DIR = DEFAULT_KB_DIR / "departments"
+MERGED_KB = {"courses": ("speakers.md",)}  # 合併的部門沿用原本的知識庫
 SHARED_KB_FILES = ("04_campus_promotion_guidelines.md",)
 
 
@@ -188,6 +186,30 @@ class MeetingDefaults(BaseModel):
 class ClubSettings(BaseModel):
     departments: dict[str, DepartmentConfig] = Field(default_factory=dict)
     meeting: MeetingDefaults = Field(default_factory=MeetingDefaults)
+
+    @model_validator(mode="after")
+    def _merge_legacy_departments(self) -> ClubSettings:
+        """舊設定中已合併的部門（例如講者）併入新部門：啟用狀態、部門細節、負責的功能都保留。"""
+        for old_key, new_key in DEPARTMENT_ALIASES.items():
+            old = self.departments.get(old_key)
+            if old is None:
+                continue
+            departments = {k: v for k, v in self.departments.items() if k != old_key}
+            merged = departments.get(new_key) or DepartmentConfig()
+            update: dict = {}
+            if old.enabled and not merged.enabled:
+                update["enabled"] = True
+            if old.details and old.details not in merged.details:
+                update["details"] = "\n".join(x for x in (merged.details, old.details) if x)
+            if old.enabled and merged.features is not None:
+                extra = [f for f in (old.features if old.features is not None else ()) if f not in merged.features]
+                if FEATURE_SPEAKERS not in merged.features and old.features is None:
+                    extra.append(FEATURE_SPEAKERS)
+                if extra:
+                    update["features"] = [*merged.features, *extra]
+            departments[new_key] = merged.model_copy(update=update)
+            self.departments = departments
+        return self
 
     @classmethod
     def default(cls, enabled: tuple[str, ...] | list[str] = DEFAULT_ENABLED) -> ClubSettings:
@@ -236,6 +258,7 @@ class ClubSettings(BaseModel):
         return self.model_copy(update={"departments": {**self.departments, key: config}}), key
 
     def name(self, key: str) -> str:
+        key = canonical_department(key)
         cfg = self.config(key)
         if cfg.display_name.strip():
             return cfg.display_name.strip()
@@ -276,7 +299,8 @@ def department_retriever(key: str, kb_dir: Path = DEFAULT_KB_DIR) -> BM25Retriev
             retriever = BM25Retriever([*retriever.chunks, *split_markdown(design.name, design.read_text(encoding="utf-8"))])
         return retriever
     chunks: list[Chunk] = []
-    for path in sorted((kb_dir / "departments").glob(f"{key}.md")) if key in DEPARTMENTS else []:
+    files = [f"{key}.md", *MERGED_KB.get(key, ())] if key in DEPARTMENTS else []
+    for path in [kb_dir / "departments" / f for f in files if (kb_dir / "departments" / f).exists()]:
         chunks.extend(split_markdown(path.name, path.read_text(encoding="utf-8")))
     for name in SHARED_KB_FILES:
         path = kb_dir / name

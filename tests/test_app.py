@@ -196,7 +196,7 @@ def test_settings_enable_rename_and_details():
     _button(at, "儲存部門設定").click().run()
     assert not at.exception
     options = at.selectbox(key="dept").options
-    assert "課程" in options and "財務長" in options
+    assert "課程與講座" in options and "財務長" in options
 
     at.checkbox(key="set_en_president").uncheck()
     _button(at, "儲存部門設定").click().run()
@@ -410,7 +410,7 @@ def test_finance_pin_required_and_big_amount_needs_president():
     assert any("已核准、待撥款（1 筆，共 5,000 元）" in m.value for m in at.markdown)
 
 
-def test_speakers_department_flow(monkeypatch):
+def test_courses_and_speakers_merged_department(monkeypatch):
     from club_agent.schemas import Letter
 
     original = GeminiLLM.structured
@@ -420,10 +420,10 @@ def test_speakers_department_flow(monkeypatch):
     at = _app()
     _signup(at)
     _open(at, "settings")
-    at.checkbox(key="set_en_speakers").check()
+    at.checkbox(key="set_en_courses").check()
     _button(at, "儲存部門設定").click().run()
-    _switch(at, "speakers")
-    assert [t.label for t in at.tabs] == ["講座總覽（0）", "新增講座", "信件與通知", "講座彙整", "部門顧問"]
+    _switch(at, "courses")
+    assert [t.label for t in at.tabs] == ["學期課表（0）", "出席與回饋", "講座總覽（0）", "新增講座", "信件與通知", "講座彙整", "部門顧問"]
     _input(at, "講者姓名＊").input("王小明")
     _input(at, "講座主題＊").input("手機街拍")
     _input(at, "聯絡方式").input("ming@example.com")
@@ -633,7 +633,7 @@ def test_venue_equipment_loan_flow():
     assert any("已新增「演藝廳」" in s.value for s in at.success)
 
 
-def test_members_recruiting_and_handover(monkeypatch):
+def test_members_recruiting(monkeypatch):
     from club_agent.schemas import HandoverManual
     from club_agent.store import LocalClubStore
     from club_agent.members import Applicant, save_applicant
@@ -651,13 +651,10 @@ def test_members_recruiting_and_handover(monkeypatch):
     store = LocalClubStore(os.environ["CLUB_AGENT_DATA_DIR"])
     save_applicant(store, at.session_state.club_id, Applicant(name="小明", source="社博", result="錄取"))
     _switch(at, "members")
-    assert [t.label for t in at.tabs][:3] == ["社員名單（0）", "招生與面試（1）", "交接手冊"]
+    assert [t.label for t in at.tabs] == ["社員名單（0）", "招生與面試（1）", "部門顧問"]  # 交接手冊分頁已拿掉
     _button(at, "把 1 位錄取者加入社員名單").click().run()
     assert any("已加入 1 位社員：小明" in s.value for s in at.success)
     assert "社員名單（1）" in [t.label for t in at.tabs]
-    _button(at, "產生交接手冊").click().run()
-    assert not at.exception
-    assert any("公關部交接" in m.value or "提早聯絡" in m.value for m in at.markdown)
 
 
 

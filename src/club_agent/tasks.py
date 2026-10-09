@@ -11,9 +11,9 @@ from collections import defaultdict
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
-from .departments import ClubSettings
+from .departments import ClubSettings, canonical_department
 
 Status = Literal["待辦", "進行中", "完成"]
 STATUSES: tuple[Status, ...] = ("待辦", "進行中", "完成")
@@ -32,6 +32,11 @@ class Task(BaseModel):
     project: str = Field(default="", description="所屬活動專案 id；活動籌備清單的任務會填這個")
     created_at: str = Field(default_factory=lambda: datetime.now().isoformat(timespec="seconds"))
     updated_at: str = Field(default_factory=lambda: datetime.now().isoformat(timespec="seconds"))
+
+    @field_validator("department")
+    @classmethod
+    def _canonical_department(cls, value: str) -> str:
+        return canonical_department(value)  # 已合併部門的舊待辦歸到新部門
 
     def due_date(self) -> date | None:
         try:

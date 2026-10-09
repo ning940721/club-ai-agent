@@ -21,9 +21,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Protocol
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
-from .departments import ClubSettings
+from .departments import ClubSettings, canonical_department
 from .schemas import ClubProfile
 
 # 舊版建立、沒有部門設定的社團：沿用當時的七個部門，並加上社長
@@ -45,6 +45,11 @@ class Record(BaseModel):
     title: str = Field(description="問題或活動名稱")
     summary: str = Field(description="一兩句摘要，顯示在「AI Agent 問答」的分享列表")
     markdown: str = Field(description="完整內容")
+
+    @field_validator("department")
+    @classmethod
+    def _canonical_department(cls, value: str) -> str:
+        return canonical_department(value)  # 已合併部門的舊紀錄歸到新部門
 
 
 class ClubAccount(BaseModel):
