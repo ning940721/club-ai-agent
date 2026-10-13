@@ -13,6 +13,7 @@ from ..departments import CUSTOM_PREFIX, DEPARTMENTS, FEATURES, ClubSettings, De
 from ..meetings import list_meetings
 from ..report import advice_markdown, meeting_answer_markdown
 from ..schemas import ClubProfile
+from ..library import file_chunks, list_files
 from ..metrics import TEMPLATE_CSV
 from ..store import StoreError, activity_digest
 from ..tasks import STATUSES, Task, delete_task, list_tasks, save_task, tasks_digest
@@ -62,7 +63,9 @@ def club_qa_box(ctx: AppContext, key: str, examples: tuple[str, ...]) -> None:
                 records = ctx.store.list_records(ctx.club_id, limit=60)
                 tasks = tasks_digest(list_tasks(ctx.store, ctx.club_id), ctx.settings, today)
                 calendar = events_digest(club_events(ctx.store, ctx.club_id, ctx.settings), today, settings=ctx.settings)
-                return ClubQA(llm).run(q, docs, club_retriever(docs, records, ctx.settings.name), tasks, today, calendar)
+                files = file_chunks(list_files(ctx.store, ctx.club_id), ctx.settings.name)
+                retriever = club_retriever(docs, records, ctx.settings.name, files)
+                return ClubQA(llm).run(q, docs, retriever, tasks, today, calendar)
 
             # 問答只需要從資料找答案，用最低思考程度回應最快
             answer = ctx.run_ai("翻閱社團資料中…", ask, thinking="minimal")
@@ -267,7 +270,7 @@ def dept_task_strip(ctx: AppContext, open_tasks_page) -> None:
 
 
 def feed_page(ctx: AppContext) -> None:
-    st.caption("直接問社團的事，AI Agent 會從各部門分享的成果、會議記錄、待辦與行事曆找答案並附上出處。")
+    st.caption("直接問社團的事，AI Agent 會從各部門分享的成果、會議記錄、文件庫、待辦與行事曆找答案並附上出處。")
     club_qa_box(ctx, "agent", AGENT_EXAMPLES)
 
     st.divider()
@@ -440,6 +443,7 @@ def help_page() -> None:
    - 待辦與進度：每位幹部都可以新增、更新任務；預設顯示自己部門，可以選擇查看其他部門或全部部門。每個部門頁面最上方也會顯示本部門的待辦
    - AI Agent 問答：上方可以直接提問（例：下次發文時間是什麼時候？），AI 會從各部門分享的成果、會議記錄、待辦與行事曆找答案；下方列出各部門分享的成果，產生結果時可以選擇要不要分享
    - 行事曆：幹部會議、活動、講座、會議記錄提到的日期、待辦與追蹤期限、各部門新增的行程；可以匯出到 Google 日曆
+   - 文件庫：各部門上傳的 Word、PDF、Excel、簡報、圖片，可依部門與類別篩選、搜尋內容；AI Agent 問答也會參考
    - 報帳申請：申請報帳並用報帳編號查詢進度；單據正本請交給財務
 4. **社團設定**（左側選單下方）：選擇社團有哪些部門、**每個部門負責哪些功能**（例如公關兼講者）、新增系統沒有的自訂部門、改名稱、填寫部門細節、修改密碼。
 5. 所有報告都可以下載成 **Word** 或 **PDF**。

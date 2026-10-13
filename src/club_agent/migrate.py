@@ -41,7 +41,8 @@ def main(argv: list[str] | None = None) -> int:
     except StoreError as e:
         print(str(e))
         return 1
-    print(f"完成：搬移 {stats['clubs']} 個社團、{stats['docs']} 筆資料、{stats['records']} 筆分享的成果；略過 {stats['skipped']} 個社團。")
+    print(f"完成：搬移 {stats['clubs']} 個社團、{stats['docs']} 筆資料、{stats['records']} 筆分享的成果、{stats['files']} 個檔案；"
+          f"略過 {stats['skipped']} 個社團。")
     return 0
 
 

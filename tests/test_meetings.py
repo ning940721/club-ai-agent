@@ -68,7 +68,7 @@ def test_extract_text_formats():
     assert extract_text("a.docx", make_docx(["第一段", "第二段"])) == "第一段\n第二段"
     assert extract_text("a.txt", "你好".encode("cp950")) == "你好"
     try:
-        extract_text("a.pdf", b"")
+        extract_text("a.pages", b"")  # 不支援的格式（PDF 已支援）
         raise AssertionError
     except ValueError as e:
         assert ".docx" in str(e)

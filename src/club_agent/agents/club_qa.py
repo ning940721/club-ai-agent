@@ -14,7 +14,7 @@ from ..retriever import BM25Retriever, Chunk, format_context, split_markdown
 from ..schemas import MeetingAnswer
 from ..store import Record
 
-SYSTEM_PROMPT = """你是學生社團的 AI Agent，根據社團的會議記錄、各部門分享的成果（診斷報告、企劃、顧問建議…）、待辦清單與行事曆回答幹部的問題。
+SYSTEM_PROMPT = """你是學生社團的 AI Agent，根據社團的會議記錄、各部門分享的成果（診斷報告、企劃、顧問建議…）、文件庫的檔案、待辦清單與行事曆回答幹部的問題。
 
 工作原則：
 - 只能根據提供的資料回答；找不到答案時 found 設為 false，說明資料中沒有提到，並建議可以去哪裡補資料，絕不猜測。
@@ -25,10 +25,12 @@ SYSTEM_PROMPT = """你是學生社團的 AI Agent，根據社團的會議記錄�
 - 全部使用繁體中文。"""
 
 
-def club_retriever(docs: list[MeetingDoc], records: list[Record], settings_name=lambda k: k) -> BM25Retriever | None:
-    """把會議記錄與各部門分享的成果切成段落一起檢索。"""
+def club_retriever(
+    docs: list[MeetingDoc], records: list[Record], settings_name=lambda k: k, extra: list[Chunk] | None = None
+) -> BM25Retriever | None:
+    """把會議記錄、各部門分享的成果與文件庫（extra）切成段落一起檢索。"""
     meeting = build_retriever(docs)
-    chunks: list[Chunk] = list(meeting.chunks) if meeting else []
+    chunks: list[Chunk] = [*(meeting.chunks if meeting else []), *(extra or [])]
     for r in records:
         if r.kind == "meeting":
             continue  # 會議重點已包含在會議記錄裡

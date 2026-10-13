@@ -23,6 +23,7 @@ from .export import to_docx
 from .finance import budget_rows, list_entries, policy_markdown, summarize_period, to_excel, transactions
 from .finance import get_settings as finance_settings
 from .finance import list_requests as list_reimbursements
+from .library import list_files as list_library
 from .meetings import list_meetings
 from .members import list_applicants, list_members
 from .partners import list_partners, sponsorship_markdown
@@ -212,6 +213,15 @@ def build_handover_zip(
         pack.add("10_人資/社員名單.xlsx", _xlsx(sheets))
         counts.append(f"社員 {len(members)} 人")
 
+    # 文件庫：依部門放原始檔
+    library = list_library(store, club_id)
+    for f in library:
+        data = store.get_file(club_id, f.key)
+        if data:
+            pack.add(f"12_文件庫/{name(f.department)}/{f.category}/{f.name}", data)
+    if library:
+        counts.append(f"文件庫檔案 {len(library)} 個")
+
     # 財務（需要財務密碼）
     if include_finance:
         fs = finance_settings(store, club_id)
@@ -236,7 +246,8 @@ def build_handover_zip(
         "- 02_會議記錄：每次會議的重點整理與原文",
         "- 03_各部門：各部門分享過的成果" + ("與 AI 交接手冊" if manuals else ""),
         "- 04–10：活動專案、講座、合作與贊助、行銷、課程、總務、人資",
-        "- 11_財務：" + ("學期財務報表與報帳規範" if include_finance else "未包含（需要財務密碼）"), "",
+        "- 11_財務：" + ("學期財務報表與報帳規範" if include_finance else "未包含（需要財務密碼）"),
+        "- 12_文件庫：各部門上傳的原始檔案，依部門與類別分資料夾", "",
         "## 注意事項",
         "- 這份資料包含社團內部資訊，請存放在幹部共用的雲端資料夾，不要公開分享。",
         "- 帳號密碼請私下移交，不要放進這份資料。",

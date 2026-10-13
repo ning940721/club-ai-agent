@@ -19,6 +19,7 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import secrets
 import uuid
 from datetime import datetime
@@ -80,6 +81,15 @@ def check_collection(collection: str) -> None:
         raise StoreError(f"不合法的集合名稱：{collection}")
 
 
+FILE_KEY = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$")
+
+
+def check_file_key(key: str) -> None:
+    """檔案代號只能用英數字與 . _ -（不能有路徑），避免讀寫到其他資料夾。"""
+    if not FILE_KEY.match(key) or ".." in key:
+        raise StoreError(f"不合法的檔案代號：{key}")
+
+
 def club_id_for(account: str) -> str:
     return hashlib.sha256(normalize_account(account).encode("utf-8")).hexdigest()[:16]
 
@@ -104,6 +114,9 @@ class ClubStore(Protocol):
     def delete_doc(self, club_id: str, collection: str, doc_id: str) -> None: ...
     def add_record(self, club_id: str, record: Record) -> None: ...
     def list_records(self, club_id: str, department: str | None = None, limit: int | None = None) -> list[Record]: ...
+    def put_file(self, club_id: str, key: str, data: bytes, content_type: str = "application/octet-stream") -> None: ...
+    def get_file(self, club_id: str, key: str) -> bytes | None: ...
+    def delete_file(self, club_id: str, key: str) -> None: ...
 
 
 class BaseClubStore:
@@ -250,6 +263,29 @@ class LocalClubStore(BaseClubStore):
         docs = self._read_collection(path)
         if docs.pop(doc_id, None) is not None:
             self._write_collection(path, docs)
+
+    # --- 檔案（文件庫） ---
+
+    def _file_path(self, club_id: str, key: str) -> Path:
+        check_file_key(key)
+        self._load(club_id)  # 確認社團存在
+        return self._dir(club_id) / "files" / key
+
+    def put_file(self, club_id: str, key: str, data: bytes, content_type: str = "application/octet-stream") -> None:
+        path = self._file_path(club_id, key)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+
+    def get_file(self, club_id: str, key: str) -> bytes | None:
+        path = self._file_path(club_id, key)
+        return path.read_bytes() if path.exists() else None
+
+    def delete_file(self, club_id: str, key: str) -> None:
+        self._file_path(club_id, key).unlink(missing_ok=True)
+
+    def file_keys(self, club_id: str) -> list[str]:
+        folder = self._dir(club_id) / "files"
+        return sorted(p.name for p in folder.iterdir() if p.is_file()) if folder.exists() else []
 
     def add_record(self, club_id: str, record: Record) -> None:
         self._load(club_id)  # 確認社團存在

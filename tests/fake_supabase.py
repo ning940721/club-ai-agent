@@ -112,10 +112,40 @@ class _Query:
                 raise FakeAPIError("23505", f"duplicate key value violates unique constraint on {columns}")
 
 
+class _Bucket:
+    def __init__(self, files: dict[str, bytes]):
+        self.files = files
+
+    def upload(self, path, file, file_options=None):
+        if path in self.files and str((file_options or {}).get("upsert")) != "true":
+            raise FakeAPIError("409", "The resource already exists")
+        self.files[path] = bytes(file)
+        return {"path": path}
+
+    def download(self, path, options=None):
+        if path not in self.files:
+            raise FakeAPIError("404", "Object not found")
+        return self.files[path]
+
+    def remove(self, paths):
+        for p in paths:
+            self.files.pop(p, None)
+        return [{"name": p} for p in paths]
+
+
+class _Storage:
+    def __init__(self):
+        self.buckets: dict[str, dict[str, bytes]] = {}
+
+    def from_(self, bucket):
+        return _Bucket(self.buckets.setdefault(bucket, {}))
+
+
 class FakeClient:
     def __init__(self):
         self.tables: dict[str, list[dict]] = {}
         self.calls = 0
+        self.storage = _Storage()
 
     def table(self, name):
         return _Query(self, name)

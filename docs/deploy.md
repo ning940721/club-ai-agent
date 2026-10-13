@@ -19,7 +19,8 @@
    - Database Password：按 Generate 產生，**存在安全的地方**（之後通常用不到）
    - Region：選離台灣近的，例如 **Northeast Asia (Tokyo)** 或 **Southeast Asia (Singapore)**
    - 按 Create new project，等 1–2 分鐘建立完成。
-3. 建立資料表：左側 **SQL Editor** → New query → 把專案裡 `docs/supabase_schema.sql` 的內容全部貼上 → 按 **Run**，看到 Success 即可。
+3. 建立資料表與文件庫的檔案空間：左側 **SQL Editor** → New query → 把專案裡 `docs/supabase_schema.sql` 的內容全部貼上 → 按 **Run**，看到 Success 即可。
+   （之後若 `supabase_schema.sql` 有更新，再貼一次執行即可，已經存在的資料不受影響。）
 4. 取得連線資料：左側 **Project Settings**（齒輪）→
    - **Data API**：複製 **Project URL**（像 `https://abcdefgh.supabase.co`）
    - **API Keys**：複製 **service_role** 金鑰（在「Legacy API Keys」分頁，按 Reveal 顯示），或新版的 **secret key**（`sb_secret_` 開頭）
@@ -34,7 +35,7 @@
    SUPABASE_URL = "https://abcdefgh.supabase.co"
    SUPABASE_KEY = "剛才複製的 service_role 或 secret 金鑰"
    ```
-2. 雙擊專案資料夾裡的 **「搬資料到線上資料庫.bat」**，看到「完成：搬移 1 個社團…」就成功了。
+2. 雙擊專案資料夾裡的 **「搬資料到線上資料庫.bat」**，看到「完成：搬移 1 個社團…」就成功了（文件庫的檔案也會一起搬）。
    - 電腦上的資料不會被刪除；重複執行時，線上已經有的社團會略過。
 3. 之後在自己電腦雙擊「啟動網頁」也會改用線上資料庫（登入頁下方會顯示「資料存放：線上資料庫」），
    和網站上看到的是同一份資料。想改回存在電腦上，刪掉這兩行即可。

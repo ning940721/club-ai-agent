@@ -2,6 +2,8 @@
 # 不在檔案變動時自動重跑：更新程式（git pull）的瞬間檔案可能暫時不存在，自動重跑會出現
 # 「No such file or directory: app.py」。更新後請關掉黑色視窗，再雙擊「啟動網頁」。
 runOnSave = false
+# 上傳檔案上限（MB）；文件庫單一檔案最多 20 MB
+maxUploadSize = 20
 
 [client]
 # 隱藏右上角的 Deploy 等開發者選單

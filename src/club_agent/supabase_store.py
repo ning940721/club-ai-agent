@@ -19,9 +19,10 @@ import threading
 import time
 from typing import Any, Callable
 
-from .store import BaseClubStore, ClubAccount, LocalClubStore, Record, StoreError, check_collection
+from .store import BaseClubStore, ClubAccount, LocalClubStore, Record, StoreError, check_collection, check_file_key
 
 PAGE = 1000  # Supabase 每次最多回傳 1000 筆
+BUCKET = "club-files"  # 文件庫的檔案（私人 bucket，建立方式見 docs/supabase_schema.sql）
 
 
 class _Cache:
@@ -143,6 +144,31 @@ class SupabaseClubStore(BaseClubStore):
         self.client.table("club_docs").delete().eq("club_id", club_id).eq("collection", collection).eq("doc_id", doc_id).execute()
         self.cache.update(("docs", club_id, collection), lambda docs: docs.pop(doc_id, None))
 
+    # --- 檔案（文件庫）：存在 Supabase Storage，路徑 <club_id>/<key>；檔案不放暫存 ---
+
+    def _bucket(self):
+        return self.client.storage.from_(BUCKET)
+
+    def put_file(self, club_id: str, key: str, data: bytes, content_type: str = "application/octet-stream") -> None:
+        check_file_key(key)
+        self._load(club_id)
+        self._bucket().upload(f"{club_id}/{key}", data, {"content-type": content_type, "upsert": "true"})
+
+    def get_file(self, club_id: str, key: str) -> bytes | None:
+        check_file_key(key)
+        self._load(club_id)
+        try:
+            return self._bucket().download(f"{club_id}/{key}")
+        except Exception as e:  # 檔案不存在
+            if "not found" in str(e).lower() or "404" in str(e):
+                return None
+            raise
+
+    def delete_file(self, club_id: str, key: str) -> None:
+        check_file_key(key)
+        self._load(club_id)
+        self._bucket().remove([f"{club_id}/{key}"])
+
     # --- 各部門分享的成果 ---
 
     def _records(self, club_id: str) -> list[Record]:
@@ -173,7 +199,7 @@ def migrate_local(local: LocalClubStore, remote: SupabaseClubStore, overwrite: b
     """把本機資料（data/clubs）搬到線上資料庫。預設不覆蓋線上已經存在的社團帳號。"""
     if not local.club_ids():
         raise StoreError(f"找不到本機資料：{local.root}")
-    stats = {"clubs": 0, "skipped": 0, "docs": 0, "records": 0}
+    stats = {"clubs": 0, "skipped": 0, "docs": 0, "records": 0, "files": 0}
     for club_id in local.club_ids():
         raw = local.raw_account(club_id)
         if not remote.import_account(raw, overwrite=overwrite):
@@ -185,6 +211,9 @@ def migrate_local(local: LocalClubStore, remote: SupabaseClubStore, overwrite: b
             for doc_id, data in local.list_doc_items(club_id, collection).items():
                 remote.put_doc(club_id, collection, doc_id, data)
                 stats["docs"] += 1
+        for key in local.file_keys(club_id):
+            remote.put_file(club_id, key, local.get_file(club_id, key) or b"")
+            stats["files"] += 1
         existing = {r.id for r in remote.list_records(club_id)}
         for record in reversed(local.list_records(club_id)):  # 由舊到新寫入，保留順序
             if record.id not in existing:

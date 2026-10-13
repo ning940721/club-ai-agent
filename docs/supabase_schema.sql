@@ -35,3 +35,8 @@ create index if not exists club_records_club_created on club_records (club_id, c
 alter table clubs enable row level security;
 alter table club_docs enable row level security;
 alter table club_records enable row level security;
+
+-- 文件庫的檔案空間（私人，只有 service_role 金鑰能存取）
+insert into storage.buckets (id, name, public, file_size_limit)
+values ('club-files', 'club-files', false, 20971520)
+on conflict (id) do nothing;

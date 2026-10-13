@@ -64,7 +64,14 @@ def extract_text(filename: str, data: bytes) -> str:
         return docx_text(data)
     if name.endswith((".txt", ".md", ".csv")):
         return decode_csv_bytes(data)
-    raise ValueError("目前支援 .txt、.md、.docx 檔；Google 文件請先下載成 .docx")
+    if name.endswith(".pdf"):
+        from .library import extract_text as library_text
+
+        text = library_text(filename, data)
+        if not text:
+            raise ValueError("這個 PDF 讀不到文字（可能是掃描的圖片），請改上傳 Word 或文字檔")
+        return text
+    raise ValueError("目前支援 .txt、.md、.docx、.pdf 檔；Google 文件請先下載成 .docx")
 
 
 def is_line_export(text: str) -> bool:

@@ -90,7 +90,7 @@ def test_migrate_local_to_supabase(tmp_path, club):
     remote, client = make_store()
     logs = []
     stats = migrate_local(local, remote, log=logs.append)
-    assert stats == {"clubs": 1, "skipped": 0, "docs": 2, "records": 2}
+    assert stats == {"clubs": 1, "skipped": 0, "docs": 2, "records": 2, "files": 0}
     fresh = SupabaseClubStore(client)
     assert fresh.authenticate("m-club", "secret123") == cid  # 密碼雜湊原樣搬過去
     assert fresh.get_doc(cid, "tasks", "t1") == {"title": "寄信"}

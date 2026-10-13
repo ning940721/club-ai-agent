@@ -50,6 +50,16 @@
 - 社長：一鍵產生各部門進度彙整與下次會議議程。
 - 帳號可變更密碼；網頁程式拆分為 web/ 下的多個頁面檔。
 
+## 2026-10-14｜v0.27.0 文件庫
+
+- 側邊欄「幹部共用」新增「文件庫」（library.py、web/library_pages.py）：上傳 Word、PDF、Excel、簡報、圖片等（單檔 20 MB），
+  選擇部門、類別、說明；依部門（預設目前部門）與類別篩選、搜尋檔名與內文、下載、修改資訊、刪除。
+- 上傳時擷取文字（docx、pdf〔pypdf〕、xlsx、pptx、txt），用於搜尋，並加入 AI Agent 問答的檢索（file_chunks）。
+- 儲存層新增檔案操作 put_file／get_file／delete_file：本機存在 data/clubs/<id>/files，線上存在 Supabase Storage 私人 bucket「club-files」
+  （docs/supabase_schema.sql 已加入建立指令）；搬資料工具一併搬移檔案。
+- 會議記錄上傳的原始檔自動放進文件庫（會議記錄部門、類別「會議記錄」）；會議記錄也接受 PDF。
+- 交接資料包新增「12_文件庫」，依部門與類別放原始檔。
+
 ## 2026-10-09｜v0.26.0 線上資料庫（第六批）
 
 - 儲存層重構：BaseClubStore 集中帳號邏輯（建立、登入、改密碼、社團資料與設定）；LocalClubStore 存本機檔案；

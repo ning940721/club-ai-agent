@@ -736,3 +736,31 @@ def test_app_runs_on_online_database(monkeypatch):
 def test_tests_never_read_real_secrets():
     at = _app()
     assert any("資料存放：這台電腦" in c.value for c in at.caption)  # 就算 secrets.toml 有線上資料庫設定也不會用
+
+
+def test_library_page_filters_and_handover_pack():
+    import io
+    import zipfile
+
+    from club_agent.library import add_file
+    from club_agent.store import LocalClubStore
+
+    at = _app()
+    _signup(at)
+    store = LocalClubStore(os.environ["CLUB_AGENT_DATA_DIR"])
+    cid = at.session_state.club_id
+    add_file(store, cid, "場地規定.txt", "借用演藝廳需兩週前申請".encode("utf-8"), "president", category="規章與辦法")
+    add_file(store, cid, "海報.png", b"\x89PNG", "marketing", category="照片與設計")
+    _open(at, "library")
+    assert "文件庫" in _page_title(at)
+    assert any("場地規定.txt" in m.value for m in at.markdown) and not any("海報.png" in m.value for m in at.markdown)  # 預設看自己部門
+    at.selectbox(key="lib_dept_president").set_value("__all__").run()
+    assert any("海報.png" in m.value for m in at.markdown)
+    _input(at, "搜尋檔名或內容").input("演藝廳")
+    at.run()
+    assert any("場地規定.txt" in m.value for m in at.markdown) and not any("海報.png" in m.value for m in at.markdown)
+
+    _button(at, "返回部門功能").click().run()
+    _button(at, "整理交接資料包").click().run()
+    names = zipfile.ZipFile(io.BytesIO(at.session_state.handover_zip[0])).namelist()
+    assert any(n.endswith("12_文件庫/社長/規章與辦法/場地規定.txt") for n in names)

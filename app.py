@@ -51,6 +51,7 @@ from club_agent.web.common_pages import (  # noqa: E402
 from club_agent.web.context import AppContext  # noqa: E402
 from club_agent.web.style import inject_css, page_header, sidebar_brand  # noqa: E402
 from club_agent.web.marketing_pages import diagnosis_page, monthly_page  # noqa: E402
+from club_agent.web.library_pages import library_page  # noqa: E402
 from club_agent.web.meeting_pages import meeting_tabs  # noqa: E402
 from club_agent.web.member_pages import handover_pack_page, member_tabs  # noqa: E402
 from club_agent.web.pr_pages import pr_tabs  # noqa: E402
@@ -154,6 +155,7 @@ SHARED_PAGES = {
     "tasks": ("待辦與進度", ":material/checklist:", tasks_page),
     "feed": ("AI Agent 問答", ":material/smart_toy:", feed_page),
     "calendar": ("行事曆", ":material/calendar_month:", calendar_page),
+    "library": ("文件庫", ":material/folder_open:", library_page),
     "reimburse": ("報帳申請", ":material/receipt_long:", reimburse_page),
 }
 OTHER_PAGES = {

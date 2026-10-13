@@ -8,6 +8,8 @@ from typing import Callable
 import streamlit as st
 
 from ..agenda import find_plan_for, get_plan, list_plans
+from ..library import add_file
+from ..store import StoreError
 from ..agents import MeetingQA, MeetingSummarizer
 from ..meetings import (
     SOURCE_TYPES,
@@ -85,7 +87,7 @@ def add_section(ctx: AppContext) -> None:
     source_type = c1.selectbox("類型", SOURCE_TYPES, key="m_type")
     meeting_date = c2.date_input("日期", value=date.today(), key="m_date")
     title = c3.text_input("標題", placeholder="例：第 5 次幹部會、成果展籌備群組", key="m_title")
-    uploaded = st.file_uploader("上傳檔案（.txt／.md／.docx；LINE 請用「傳送聊天記錄」匯出的 .txt）", type=["txt", "md", "docx"], key="m_file")
+    uploaded = st.file_uploader("上傳檔案（.txt／.md／.docx／.pdf；LINE 請用「傳送聊天記錄」匯出的 .txt）", type=["txt", "md", "docx", "pdf"], key="m_file")
     pasted = st.text_area("或直接貼上內容", height=200, key="m_text")
     plan_id = plan_picker(ctx, meeting_date)
 
@@ -121,7 +123,15 @@ def add_section(ctx: AppContext) -> None:
             ctx.save_record("meeting", doc.title, summary.summary[:150], _summary_md(ctx, doc), department="minutes")
     save_meeting(ctx.store, ctx.club_id, doc)
     st.session_state.last_meeting_id = doc.id
-    st.success(f"已儲存「{doc.title}」")
+    saved_file = ""
+    if uploaded is not None:  # 原始檔同時放進文件庫，之後可以下載
+        try:
+            add_file(ctx.store, ctx.club_id, uploaded.name, uploaded.getvalue(), "minutes" if "minutes" in ctx.settings.enabled_keys()
+                     else ctx.dept_key, title=f"{doc.date} {doc.title}", category="會議記錄", source="會議記錄")
+            saved_file = "，原始檔已放進文件庫"
+        except StoreError:
+            pass
+    st.success(f"已儲存「{doc.title}」{saved_file}")
 
 
 def action_items_to_tasks(ctx: AppContext, doc: MeetingDoc) -> None:
