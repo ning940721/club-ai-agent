@@ -220,7 +220,7 @@ dept_task_strip(ctx, lambda: open_side_page("tasks"))  # 每個部門一進來�
 # 有些部門的功能需要先在分頁上方選擇對象（例如活動），所以先取得分頁清單（會先畫出上方的選單），再建立分頁。
 # 每個功能模組對應的分頁；部門負責哪些模組由社團設定決定（社團可以自訂分工）
 MODULE_TABS: dict[str, Callable[[], list[tuple[str, Callable[[], None]]]]] = {
-    FEATURE_PRESIDENT: lambda: [("社團總覽", lambda: president_page(ctx)), ("開會模式", lambda: live_meeting_page(ctx))],
+    FEATURE_PRESIDENT: lambda: [("社團總覽", lambda: president_page(ctx)), ("會議", lambda: live_meeting_page(ctx))],
     FEATURE_MEETINGS: lambda: meeting_tabs(ctx),
     FEATURE_MARKETING: lambda: [("社群數據診斷", lambda: diagnosis_page(ctx)), ("月報與趨勢", lambda: monthly_page(ctx))],
     FEATURE_DESIGN: lambda: design_tabs(ctx),

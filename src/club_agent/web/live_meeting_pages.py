@@ -38,13 +38,19 @@ def _text(value) -> str:
 
 
 def live_meeting_page(ctx: AppContext) -> None:
+    """「會議」分頁：沒有進行中的會議時，上半部排下次幹部會議、下半部開始開會；開會中只顯示開會畫面。"""
+    from .president_pages import meeting_planning
+
     if message := st.session_state.pop("live_flash", None):
         st.success(message)
     meeting = running_meeting(ctx.store, ctx.club_id)
-    if meeting is None:
-        setup_view(ctx)
-    else:
+    if meeting is not None:
         running_view(ctx, meeting)
+        return
+    meeting_planning(ctx)
+    st.divider()
+    st.subheader("開始開會")
+    setup_view(ctx)
 
 
 # ---------------------------------------------------------------------------

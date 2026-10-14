@@ -177,7 +177,7 @@ def meeting_tabs(ctx: AppContext) -> list[tuple[str, Callable[[], None]]]:
 
     docs = list_meetings(ctx.store, ctx.club_id)
     return [
-        ("開會模式", lambda: live_meeting_page(ctx)),
+        ("會議", lambda: live_meeting_page(ctx)),
         ("記錄問答", lambda: ask_section(ctx, docs)),
         ("新增記錄", lambda: add_section(ctx)),
         (f"所有記錄（{len(docs)}）", lambda: records_section(ctx, list_meetings(ctx.store, ctx.club_id))),

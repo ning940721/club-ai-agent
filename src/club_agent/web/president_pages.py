@@ -1,4 +1,4 @@
-"""社長專屬：各部門進度總覽，自動產出進度彙整與下次會議議程。"""
+"""社長專屬：社團總覽（各部門進度、逾期任務、近期行程、全社團待辦），以及會議頁面上半部的「下次幹部會議」。"""
 
 from __future__ import annotations
 
@@ -56,8 +56,12 @@ def meeting_inputs(ctx: AppContext, today: date, default_date: date) -> tuple[da
     start = c2.time_input("開始時間", value=parse_time(saved.start), step=300, key="mt_start")
     minutes = c3.number_input("會議時長（分鐘）", min_value=10, max_value=480, value=saved.minutes, step=10, key="mt_minutes")
     location = c4.text_input("地點（選填）", value=saved.location, placeholder="例：社辦、線上 Google Meet", key="mt_location")
-    link = st.text_input("視訊會議連結（選填，Google Meet、Teams…）", value=saved.video_link, key="mt_link",
+    c5, c6 = st.columns([4, 1], vertical_alignment="bottom")
+    link = c5.text_input("視訊會議連結（選填，Google Meet、Teams…）", value=saved.video_link, key="mt_link",
                          placeholder="例：https://meet.google.com/abc-defg-hij")
+    # 開一個新的 Google Meet（需要登入 Google 帳號），複製網址貼回來；之後會記住，每次開會都用同一個連結
+    c6.link_button("建立 Google Meet", "https://meet.google.com/new", icon=":material/add_link:", width="stretch",
+                   help="在新分頁建立會議後，複製網址貼到左邊。系統會記住這個連結，之後不用再建立")
     if link.strip() and not is_link(link):
         st.warning("視訊連結要以 https:// 開頭，請貼上完整的會議網址")
     current = MeetingDefaults(start=f"{start:%H:%M}", minutes=int(minutes), location=location.strip(), video_link=link.strip())
@@ -237,6 +241,12 @@ def meeting_section(ctx: AppContext, tasks, records, today: date) -> None:
     ctx.share_controls("brief")
 
 
+def meeting_planning(ctx: AppContext) -> None:
+    """會議頁面上半部：排下次幹部會議（時間、議程、時間表、上次會議追蹤）。"""
+    today = date.today()
+    meeting_section(ctx, list_tasks(ctx.store, ctx.club_id), ctx.store.list_records(ctx.club_id), today)
+
+
 def president_page(ctx: AppContext) -> None:
     today = date.today()
     tasks = list_tasks(ctx.store, ctx.club_id)
@@ -277,9 +287,6 @@ def president_page(ctx: AppContext) -> None:
             st.markdown(f"- {line}")
         if not upcoming:
             st.caption("目前沒有之後的行程。排好的幹部會議、會議記錄中的日期與自行新增的行程都會出現在這裡。")
-
-    st.divider()
-    meeting_section(ctx, tasks, records, today)
 
     st.divider()
     st.subheader("全社團待辦")

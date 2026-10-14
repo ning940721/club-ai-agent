@@ -669,7 +669,7 @@ def test_president_venue_and_handover_pack():
     at = _app()
     _signup(at)
     labels = [t.label for t in at.tabs]
-    assert labels == ["社團總覽", "開會模式", "財務管理", "場地申請", "交接資料包", "部門顧問"]  # 社長不管器材
+    assert labels == ["社團總覽", "會議", "財務管理", "場地申請", "交接資料包", "部門顧問"]  # 社長不管器材
     assert not any("器材" in label for label in labels)
     store = LocalClubStore(os.environ["CLUB_AGENT_DATA_DIR"])
     save_member(store, at.session_state.club_id, Member(name="王小明", contact="0912-345-678"))
@@ -781,7 +781,12 @@ def test_live_meeting_mode_end_to_end():
     assert any(b.label == "加入視訊會議" for b in at.get("link_button"))
     _button(at, "開始會議").click().run()
     assert any("會議開始" in s.value for s in at.success)
-    assert any(h.value.startswith("1. 上次待辦追蹤") for h in at.subheader)
+    # 開會後「排會議」的欄位會消失，AppTest 會讀到已移除的欄位而出錯（實際網頁不會），所以重新開啟頁面繼續
+    club_id = at.session_state.club_id
+    at = st_testing.AppTest.from_file(APP, default_timeout=30)
+    at.session_state["club_id"] = club_id
+    at.run()
+    assert any(h.value.startswith("1. 上次待辦追蹤") for h in at.subheader)  # 會議進行中，重新整理也會接著開
     _input(at, "討論重點").input("贊助信已寄出")
     _button(at, "下一個議題").click().run()
     _input(at, "決議（一行一項）").input("各部門每週更新待辦")
