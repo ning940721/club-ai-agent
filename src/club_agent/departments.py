@@ -181,6 +181,7 @@ class MeetingDefaults(BaseModel):
     start: str = Field(default="19:00", description="開始時間 HH:MM")
     minutes: int = Field(default=90, ge=10, le=480, description="會議時長（分鐘）")
     location: str = ""
+    video_link: str = Field(default="", description="固定使用的視訊會議連結（Google Meet、Teams…）")
 
 
 class ClubSettings(BaseModel):

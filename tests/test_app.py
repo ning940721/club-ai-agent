@@ -1,6 +1,7 @@
 """網頁版冒煙測試：以假的 LLM 取代 Gemini，確認登入、各部門頁面與設定流程可以走完。"""
 
 import os
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -668,7 +669,7 @@ def test_president_venue_and_handover_pack():
     at = _app()
     _signup(at)
     labels = [t.label for t in at.tabs]
-    assert labels == ["社團總覽", "財務管理", "場地申請", "交接資料包", "部門顧問"]  # 社長不管器材
+    assert labels == ["社團總覽", "開會模式", "財務管理", "場地申請", "交接資料包", "部門顧問"]  # 社長不管器材
     assert not any("器材" in label for label in labels)
     store = LocalClubStore(os.environ["CLUB_AGENT_DATA_DIR"])
     save_member(store, at.session_state.club_id, Member(name="王小明", contact="0912-345-678"))
@@ -764,3 +765,60 @@ def test_library_page_filters_and_handover_pack():
     _button(at, "整理交接資料包").click().run()
     names = zipfile.ZipFile(io.BytesIO(at.session_state.handover_zip[0])).namelist()
     assert any(n.endswith("12_文件庫/社長/規章與辦法/場地規定.txt") for n in names)
+
+
+def test_live_meeting_mode_end_to_end():
+    from club_agent.meetings import list_meetings
+    from club_agent.store import LocalClubStore
+    from club_agent.tasks import list_tasks
+
+    at = _app()
+    _signup(at)
+    at.date_input(key="mt_date").set_value(date.today()).run()
+    _input(at, "視訊會議連結（選填，Google Meet、Teams…）").input("https://meet.google.com/abc-defg-hij")
+    at.run()
+    _button(at, "使用基本議程（不使用 AI）").click().run()  # 今天的議程
+    assert any(b.label == "加入視訊會議" for b in at.get("link_button"))
+    _button(at, "開始會議").click().run()
+    assert any("會議開始" in s.value for s in at.success)
+    assert any(h.value.startswith("1. 上次待辦追蹤") for h in at.subheader)
+    _input(at, "討論重點").input("贊助信已寄出")
+    _button(at, "下一個議題").click().run()
+    _input(at, "決議（一行一項）").input("各部門每週更新待辦")
+    _button(at, "結束會議並產生記錄").click().run()
+    assert not at.exception
+    assert any("會議結束，記錄已存在「會議記錄」" in s.value for s in at.success)
+
+    store = LocalClubStore(os.environ["CLUB_AGENT_DATA_DIR"])
+    doc = list_meetings(store, at.session_state.club_id)[0]
+    assert doc.summary.decisions == ["各部門每週更新待辦（各部門進度報告）"]
+    assert [c.result for c in doc.summary.agenda_review][:3] == ["已討論、未決議", "已決議", "未討論"]
+    assert list_tasks(store, at.session_state.club_id) == []  # 沒有記錄待辦
+    assert any("上次會議議程追蹤" in m.value for m in at.markdown)  # 社長總覽接著追蹤未完成的議題
+
+
+def test_library_preview():
+    import io
+
+    from openpyxl import Workbook
+
+    from club_agent.library import add_file
+    from club_agent.store import LocalClubStore
+
+    at = _app()
+    _signup(at)
+    store = LocalClubStore(os.environ["CLUB_AGENT_DATA_DIR"])
+    cid = at.session_state.club_id
+    note = add_file(store, cid, "社規.txt", "第一條：社費每學期 500 元".encode("utf-8"), "president")
+    wb = Workbook()
+    wb.active.append(["項目", "金額"])
+    wb.active.append(["海報", 1200])
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    sheet = add_file(store, cid, "預算.xlsx", buffer.getvalue(), "president")
+    _open(at, "library")
+    at.button(key=f"lib_pv_{note.id}").click().run()
+    assert any("第一條：社費每學期 500 元" in t.value for t in at.text)
+    at.button(key=f"lib_pv_{sheet.id}").click().run()
+    assert not at.exception
+    assert any("海報" in str(d.value.values.tolist()) for d in at.dataframe)

@@ -173,8 +173,11 @@ def records_section(ctx: AppContext, docs: list[MeetingDoc]) -> None:
 
 
 def meeting_tabs(ctx: AppContext) -> list[tuple[str, Callable[[], None]]]:
+    from .live_meeting_pages import live_meeting_page
+
     docs = list_meetings(ctx.store, ctx.club_id)
     return [
+        ("開會模式", lambda: live_meeting_page(ctx)),
         ("記錄問答", lambda: ask_section(ctx, docs)),
         ("新增記錄", lambda: add_section(ctx)),
         (f"所有記錄（{len(docs)}）", lambda: records_section(ctx, list_meetings(ctx.store, ctx.club_id))),

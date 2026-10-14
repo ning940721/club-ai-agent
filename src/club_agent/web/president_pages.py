@@ -10,6 +10,7 @@ import streamlit as st
 from ..agenda import (
     KINDS,
     AgendaRow,
+    is_link,
     MeetingPlan,
     delete_plan,
     get_plan,
@@ -47,19 +48,23 @@ def upcoming_dates(ctx: AppContext, today: date) -> list[str]:
     return lines
 
 
-def meeting_inputs(ctx: AppContext, today: date, default_date: date) -> tuple[date, object, int, str]:
-    """會議日期、開始時間、時長與地點；時間、時長、地點會存成社團預設值，下次自動帶入。"""
+def meeting_inputs(ctx: AppContext, today: date, default_date: date) -> tuple[date, object, int, str, str]:
+    """會議日期、開始時間、時長、地點與視訊連結；除了日期，都會存成社團預設值，下次自動帶入。"""
     saved = ctx.settings.meeting
     c1, c2, c3, c4 = st.columns([2, 2, 2, 3])
     meeting_date = c1.date_input("會議日期", value=default_date, key="mt_date")
     start = c2.time_input("開始時間", value=parse_time(saved.start), step=300, key="mt_start")
     minutes = c3.number_input("會議時長（分鐘）", min_value=10, max_value=480, value=saved.minutes, step=10, key="mt_minutes")
     location = c4.text_input("地點（選填）", value=saved.location, placeholder="例：社辦、線上 Google Meet", key="mt_location")
-    current = MeetingDefaults(start=f"{start:%H:%M}", minutes=int(minutes), location=location.strip())
+    link = st.text_input("視訊會議連結（選填，Google Meet、Teams…）", value=saved.video_link, key="mt_link",
+                         placeholder="例：https://meet.google.com/abc-defg-hij")
+    if link.strip() and not is_link(link):
+        st.warning("視訊連結要以 https:// 開頭，請貼上完整的會議網址")
+    current = MeetingDefaults(start=f"{start:%H:%M}", minutes=int(minutes), location=location.strip(), video_link=link.strip())
     if current != saved:
         ctx.settings = ctx.settings.model_copy(update={"meeting": current})
         ctx.store.update_settings(ctx.club_id, ctx.settings)
-    return meeting_date, start, int(minutes), location.strip()
+    return meeting_date, start, int(minutes), location.strip(), link.strip() if is_link(link) else ""
 
 
 def set_agenda(rows: list[AgendaRow]) -> None:
@@ -138,7 +143,9 @@ def meeting_section(ctx: AppContext, tasks, records, today: date) -> None:
     st.caption("設定會議時間與時長，AI 會依各部門的待辦、分享的成果與最近的會議記錄規劃議程，並排出每個議題的時段。")
     upcoming = [p for p in list_plans(ctx.store, ctx.club_id) if p.date >= today.isoformat()]
     default_date = date.fromisoformat(upcoming[-1].date) if upcoming else today + timedelta(days=7)
-    meeting_date, start, minutes, location = meeting_inputs(ctx, today, default_date)
+    meeting_date, start, minutes, location, video_link = meeting_inputs(ctx, today, default_date)
+    if video_link:
+        st.link_button("加入視訊會議", video_link, icon=":material/videocam:")
     if st.session_state.get("agenda_rows") is None and (saved := get_plan(ctx.store, ctx.club_id, meeting_date.isoformat())):
         set_agenda(saved.agenda)  # 之前排好的議程
 
@@ -167,7 +174,7 @@ def meeting_section(ctx: AppContext, tasks, records, today: date) -> None:
             set_agenda(rows)
             st.session_state.progress_brief = brief
             md = progress_brief_markdown(
-                ctx.club.name, today.isoformat(), brief, schedule_markdown(meeting_date, start, minutes, rows, location)
+                ctx.club.name, today.isoformat(), brief, schedule_markdown(meeting_date, start, minutes, rows, location, video_link=video_link)
             )
             ctx.keep_result("brief", "brief", f"進度彙整與議程（{today.isoformat()}）", brief.overview[:150], md, share, "president")
     if col_template.button("使用基本議程（不使用 AI）", width="stretch"):
@@ -204,10 +211,11 @@ def meeting_section(ctx: AppContext, tasks, records, today: date) -> None:
     else:
         st.warning(f"議程共 {used} 分鐘，超過預定時長 {used - minutes} 分鐘，建議縮短部分議題。")
 
-    remember_plan(ctx, MeetingPlan(date=meeting_date.isoformat(), start=f"{start:%H:%M}", minutes=minutes, location=location, agenda=rows))
+    remember_plan(ctx, MeetingPlan(date=meeting_date.isoformat(), start=f"{start:%H:%M}", minutes=minutes, location=location,
+                                   video_link=video_link, agenda=rows))
     st.caption("議程會自動儲存；會議記錄部門整理這場會議的記錄時，會逐一對照每個議題是否已有決議。")
 
-    agenda_md = schedule_markdown(meeting_date, start, minutes, rows, location)
+    agenda_md = schedule_markdown(meeting_date, start, minutes, rows, location, video_link=video_link)
     if brief := st.session_state.get("progress_brief"):
         md = progress_brief_markdown(ctx.club.name, today.isoformat(), brief, agenda_md)
         without_agenda = progress_brief_markdown(ctx.club.name, today.isoformat(), brief.model_copy(update={"agenda": []}))

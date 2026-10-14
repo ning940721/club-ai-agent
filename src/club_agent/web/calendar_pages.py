@@ -102,7 +102,9 @@ def event_list(ctx: AppContext, events: list[CalendarEvent]) -> None:
             f"**{day.month}/{day.day}（{WEEK_HEADER[day.weekday()]}）{e.when()}**　{e.title}　"
             f":gray[{e.kind}｜{dept}｜{e.source}{'｜' + extra if extra else ''}]"
         )
-        if e.source == SOURCE_MANUAL and c2.button("刪除", key=f"del_event_{e.id}", type="tertiary"):
+        if e.link:
+            c2.link_button("加入會議", e.link, icon=":material/videocam:")
+        elif e.source == SOURCE_MANUAL and c2.button("刪除", key=f"del_event_{e.id}", type="tertiary"):
             delete_event(ctx.store, ctx.club_id, e.id)
             st.rerun()
 

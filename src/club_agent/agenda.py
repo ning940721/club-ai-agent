@@ -89,8 +89,13 @@ def _cell(text: object) -> str:
     return str(text).replace("|", "｜").replace("\r", " ").replace("\n", " ")
 
 
+def is_link(text: str) -> bool:
+    return text.strip().lower().startswith(("https://", "http://"))
+
+
 def schedule_markdown(
-    meeting_date: date, start: time, planned_minutes: int, rows: list[AgendaRow], location: str = "", heading: str = "##"
+    meeting_date: date, start: time, planned_minutes: int, rows: list[AgendaRow], location: str = "", heading: str = "##",
+    video_link: str = "",
 ) -> str:
     used = total_minutes(rows)
     out = [
@@ -98,6 +103,7 @@ def schedule_markdown(
         "",
         f"**時間：** {meeting_description(meeting_date, start, planned_minutes, location)}",
         "",
+        *([f"**視訊會議：** {video_link.strip()}", ""] if is_link(video_link) else []),
         "| # | 時間 | 議題 | 類型 | 負責 | 分鐘 | 目標 |",
         "|---|---|---|---|---|---|---|",
     ]
@@ -123,6 +129,7 @@ class MeetingPlan(BaseModel):
     start: str = "19:00"
     minutes: int = 90
     location: str = ""
+    video_link: str = Field(default="", description="視訊會議連結")
     agenda: list[AgendaRow] = Field(default_factory=list)
 
     @property

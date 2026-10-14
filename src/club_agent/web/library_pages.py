@@ -86,8 +86,69 @@ def _snippet(text: str, query: str, width: int = 60) -> str:
     return ("…" if start else "") + text[start:i + len(query) + width].replace("\n", " ") + "…"
 
 
+PREVIEW_TEXT = (".docx", ".pptx", ".txt", ".md")
+PREVIEW_TABLE = (".xlsx", ".csv")
+PREVIEW_IMAGE = (".png", ".jpg", ".jpeg", ".gif", ".webp")
+
+
+def can_preview(f: LibraryFile) -> bool:
+    return f.name.lower().endswith((".pdf", *PREVIEW_TEXT, *PREVIEW_TABLE, *PREVIEW_IMAGE))
+
+
+def preview(ctx: AppContext, f: LibraryFile) -> None:
+    """在頁面上直接看檔案：PDF 用檢視器、圖片直接顯示、Excel 顯示表格、Word／簡報顯示文字內容。"""
+    name = f.name.lower()
+    with st.container(border=True):
+        c1, c2 = st.columns([5, 1], vertical_alignment="center")
+        c1.markdown(f"**預覽：{f.display}**")
+        if c2.button("關閉預覽", key=f"lib_close_{f.id}", type="tertiary"):
+            st.session_state.pop("lib_preview", None)
+            st.rerun()
+        data = file_bytes(ctx.store, ctx.club_id, f)
+        if not data:
+            st.warning("找不到檔案內容")
+            return
+        if name.endswith(".pdf"):
+            try:
+                st.pdf(data, height=640)
+            except Exception:  # 沒有安裝 PDF 檢視器時，改顯示文字
+                st.caption("無法顯示 PDF 檢視器，以下是 PDF 的文字內容：")
+                st.text(f.text or "（讀不到文字）")
+        elif name.endswith(PREVIEW_IMAGE):
+            st.image(data)
+        elif name.endswith(PREVIEW_TABLE):
+            import io
+
+            import pandas as pd
+
+            try:
+                if name.endswith(".csv"):
+                    from ..metrics import decode_csv_bytes
+
+                    sheets = {"": pd.read_csv(io.StringIO(decode_csv_bytes(data)), dtype=str)}
+                else:
+                    sheets = pd.read_excel(io.BytesIO(data), sheet_name=None, dtype=str, nrows=500)
+            except Exception:
+                st.caption("無法讀取表格，請下載後開啟")
+                return
+            tabs = st.tabs([s or "表格" for s in sheets]) if len(sheets) > 1 else [st.container()]
+            for tab, df in zip(tabs, sheets.values()):
+                with tab:
+                    st.dataframe(df.fillna(""), hide_index=True, width="stretch", height=360)
+            st.caption("最多顯示前 500 列；格式與公式請下載後查看。")
+        else:
+            st.caption("以下是檔案的文字內容（排版、圖片請下載後查看）")
+            with st.container(height=420):
+                if name.endswith(".md"):
+                    st.markdown(f.text)
+                else:
+                    st.text(f.text or "（這個檔案沒有文字內容）")
+
+
 def file_row(ctx: AppContext, f: LibraryFile, query: str) -> None:
-    c1, c2, c3 = st.columns([6, 1, 1], vertical_alignment="center")
+    c1, c0, c2, c3 = st.columns([6, 1, 1, 1], vertical_alignment="center")
+    if can_preview(f) and c0.button("預覽", key=f"lib_pv_{f.id}", icon=":material/visibility:"):
+        st.session_state.lib_preview = None if st.session_state.get("lib_preview") == f.id else f.id
     meta = "｜".join(x for x in (f.category, f.size_label(), f.uploaded_at[:10], f.uploader, f.source if f.source != "上傳" else "") if x)
     c1.markdown(f"**{f.display}**　:gray[{meta}]" + (f"  \n{f.note}" if f.note else "")
                 + (f"  \n:gray[{_snippet(f.text, query)}]" if _snippet(f.text, query) else ""))
@@ -108,3 +169,5 @@ def file_row(ctx: AppContext, f: LibraryFile, query: str) -> None:
         if st.button("刪除這個檔案", key=f"lib_del_{f.id}", type="tertiary"):
             delete_file(ctx.store, ctx.club_id, f)
             _flash(f"已刪除「{f.display}」")
+    if st.session_state.get("lib_preview") == f.id:
+        preview(ctx, f)

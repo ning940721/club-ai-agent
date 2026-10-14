@@ -48,6 +48,7 @@ class CalendarEvent(BaseModel):
     location: str = ""
     note: str = ""
     source: str = SOURCE_MANUAL
+    link: str = Field(default="", description="視訊會議或相關網址")
 
     def sort_key(self) -> tuple[str, str]:
         return self.date, self.time or "99:99"
@@ -86,7 +87,7 @@ def club_events(store, club_id: str, settings: ClubSettings | None = None) -> li
             CalendarEvent(
                 id=f"plan-{p.date}", date=p.date, title="幹部會議", time=f"{start:%H:%M}",
                 end=f"{end_time(start, p.minutes):%H:%M}", kind="會議", department="president",
-                location=p.location, note=f"{len(p.agenda)} 個議題", source=SOURCE_PLAN,
+                location=p.location, note=f"{len(p.agenda)} 個議題", source=SOURCE_PLAN, link=p.video_link,
             )
         )
         plan_slots.add(p.date)
@@ -260,7 +261,9 @@ def to_ics(events: list[CalendarEvent], calendar_name: str, settings: ClubSettin
         lines.append(f"SUMMARY:{_ics_text(f'[{dept}] {e.title}' if dept else e.title)}")
         if e.location:
             lines.append(f"LOCATION:{_ics_text(e.location)}")
-        description = "｜".join(x for x in (e.kind, e.note, e.source) if x)
+        description = "｜".join(x for x in (e.kind, e.note, e.source, f"視訊會議：{e.link}" if e.link else "") if x)
+        if e.link:
+            lines.append(f"URL:{e.link}")
         lines += [f"DESCRIPTION:{_ics_text(description)}", "END:VEVENT"]
     lines.append("END:VCALENDAR")
     return "\r\n".join(lines) + "\r\n"
