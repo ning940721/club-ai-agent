@@ -53,7 +53,7 @@ from club_agent.web.style import inject_css, page_header, sidebar_brand  # noqa:
 from club_agent.web.marketing_pages import diagnosis_page, monthly_page  # noqa: E402
 from club_agent.web.library_pages import library_page  # noqa: E402
 from club_agent.web.live_meeting_pages import live_meeting_page  # noqa: E402
-from club_agent.web.meeting_pages import meeting_tabs  # noqa: E402
+from club_agent.web.meeting_pages import meeting_records_page, meeting_tabs  # noqa: E402
 from club_agent.web.member_pages import handover_pack_page, member_tabs  # noqa: E402
 from club_agent.web.pr_pages import pr_tabs  # noqa: E402
 from club_agent.web.president_pages import president_page  # noqa: E402
@@ -154,6 +154,7 @@ if st.session_state.get("dept") not in enabled:
 # 側邊欄的頁面：幹部共用的功能，以及不常用的社團設定、使用說明。點選後主畫面改顯示該頁，選部門或按「返回」回到部門功能
 SHARED_PAGES = {
     "tasks": ("待辦與進度", ":material/checklist:", tasks_page),
+    "meetings": ("會議記錄", ":material/description:", meeting_records_page),
     "feed": ("AI Agent 問答", ":material/smart_toy:", feed_page),
     "calendar": ("行事曆", ":material/calendar_month:", calendar_page),
     "library": ("文件庫", ":material/folder_open:", library_page),

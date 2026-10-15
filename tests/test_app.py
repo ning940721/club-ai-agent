@@ -154,6 +154,7 @@ def test_meeting_summary_tasks_and_qa():
     at = _app()
     _signup(at)
     _switch(at, "minutes")
+    _open(at, "meetings")  # 會議記錄在側邊欄「幹部共用」
     _input(at, "或直接貼上內容").input("小明：下次開會改到 12/4 晚上七點\n決議：成果展預算 3 萬元")
     _input(at, "標題").input("第 5 次幹部會")
     _button(at, "整理重點並儲存").click().run()
@@ -326,6 +327,7 @@ def test_meeting_record_is_checked_against_agenda_and_follow_up_shown(monkeypatc
 
     monkeypatch.setattr(GeminiLLM, "structured", fake)
     _switch(at, "minutes")
+    _open(at, "meetings")  # 會議記錄在側邊欄「幹部共用」
     from datetime import date, timedelta
 
     plan_id = (date.today() + timedelta(days=7)).isoformat()  # 社長頁面預設的會議日期

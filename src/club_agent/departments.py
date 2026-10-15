@@ -32,7 +32,7 @@ FEATURE_MEMBERS = "member_tools"  # 人資：社員名單、招生與面試、�
 # 社團可以分配給部門的功能模組（設定頁的選項，依顯示順序）
 FEATURES: dict[str, tuple[str, str]] = {
     FEATURE_PRESIDENT: ("社團總覽", "各部門進度、會議時間表與議程"),
-    FEATURE_MEETINGS: ("會議記錄", "上傳會議記錄、整理重點、記錄問答"),
+    FEATURE_MEETINGS: ("會議", "排議程、開會模式（會議記錄在側邊欄，所有部門共用）"),
     FEATURE_MARKETING: ("社群數據與月報", "貼文數據診斷、月報與趨勢"),
     FEATURE_DESIGN: ("美宣設計", "處理各部門的設計需求、視覺規範、AI 設計說明與文案"),
     FEATURE_EVENTS: ("活動專案", "企劃書、籌備清單、細流、回饋表單、成果報告"),

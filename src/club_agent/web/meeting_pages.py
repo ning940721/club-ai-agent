@@ -131,7 +131,8 @@ def add_section(ctx: AppContext) -> None:
             saved_file = "，原始檔已放進文件庫"
         except StoreError:
             pass
-    st.success(f"已儲存「{doc.title}」{saved_file}")
+    st.session_state.meeting_flash = f"已儲存「{doc.title}」{saved_file}，可以在「所有記錄」查看"
+    st.rerun()  # 重新整理，讓「所有記錄」立刻出現這筆記錄
 
 
 def action_items_to_tasks(ctx: AppContext, doc: MeetingDoc) -> None:
@@ -173,12 +174,22 @@ def records_section(ctx: AppContext, docs: list[MeetingDoc]) -> None:
 
 
 def meeting_tabs(ctx: AppContext) -> list[tuple[str, Callable[[], None]]]:
+    """會議記錄部門的分頁：排議程與開會。會議記錄本身在側邊欄「幹部共用」，所有部門都能使用。"""
     from .live_meeting_pages import live_meeting_page
 
+    return [("會議", lambda: live_meeting_page(ctx))]
+
+
+def meeting_records_page(ctx: AppContext) -> None:
+    """側邊欄「會議記錄」：所有部門都能查看、上傳記錄（自動整理重點）、對記錄提問。"""
+    if message := st.session_state.pop("meeting_flash", None):
+        st.success(message)
+    st.caption("全社團的會議記錄：開會模式產生的記錄、上傳的會議記錄或 LINE 對話都在這裡，所有幹部都能查看與提問。")
     docs = list_meetings(ctx.store, ctx.club_id)
-    return [
-        ("會議", lambda: live_meeting_page(ctx)),
-        ("記錄問答", lambda: ask_section(ctx, docs)),
-        ("新增記錄", lambda: add_section(ctx)),
-        (f"所有記錄（{len(docs)}）", lambda: records_section(ctx, list_meetings(ctx.store, ctx.club_id))),
-    ]
+    tab_list, tab_add, tab_ask = st.tabs([f"所有記錄（{len(docs)}）", "新增記錄", "記錄問答"])
+    with tab_list:
+        records_section(ctx, docs)
+    with tab_add:
+        add_section(ctx)
+    with tab_ask:
+        ask_section(ctx, docs)
