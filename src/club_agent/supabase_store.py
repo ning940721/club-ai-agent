@@ -25,6 +25,15 @@ PAGE = 1000  # Supabase 每次最多回傳 1000 筆
 BUCKET = "club-files"  # 文件庫的檔案（私人 bucket，建立方式見 docs/supabase_schema.sql）
 
 
+def normalize_url(url: str) -> str:
+    """只保留專案網址（https://xxx.supabase.co）：Supabase 的 Data API 頁面顯示的網址後面有 /rest/v1/，貼上時常會一起複製。"""
+    url = url.strip().rstrip("/")
+    for suffix in ("/rest/v1", "/storage/v1", "/auth/v1"):
+        if url.endswith(suffix):
+            url = url[: -len(suffix)]
+    return url
+
+
 class _Cache:
     def __init__(self, ttl: float, clock: Callable[[], float] = time.monotonic):
         self.ttl = ttl
@@ -63,7 +72,7 @@ class SupabaseClubStore(BaseClubStore):
     def connect(cls, url: str, key: str) -> SupabaseClubStore:
         from supabase import create_client
 
-        return cls(create_client(url, key))
+        return cls(create_client(normalize_url(url), key.strip()))
 
     def _all(self, query_factory: Callable[[], Any]) -> list[dict]:
         """分頁讀取全部資料。"""

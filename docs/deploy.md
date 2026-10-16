@@ -22,7 +22,7 @@
 3. 建立資料表與文件庫的檔案空間：左側 **SQL Editor** → New query → 把專案裡 `docs/supabase_schema.sql` 的內容全部貼上 → 按 **Run**，看到 Success 即可。
    （之後若 `supabase_schema.sql` 有更新，再貼一次執行即可，已經存在的資料不受影響。）
 4. 取得連線資料：左側 **Project Settings**（齒輪）→
-   - **Data API**：複製 **Project URL**（像 `https://abcdefgh.supabase.co`）
+   - **Data API**：複製 **Project URL**（像 `https://abcdefgh.supabase.co`；後面若多了 `/rest/v1/` 也沒關係，系統會自動去掉）
    - **API Keys**：複製 **service_role** 金鑰（在「Legacy API Keys」分頁，按 Reveal 顯示），或新版的 **secret key**（`sb_secret_` 開頭）
    - ⚠️ 這把金鑰可以讀寫所有資料，**只能放在 Secrets**，不要貼到 LINE、GitHub 或任何公開的地方。
 

@@ -107,3 +107,10 @@ def test_create_store_choice(tmp_path, monkeypatch):
     monkeypatch.setattr(SupabaseClubStore, "connect", classmethod(lambda cls, url, key: cls(FakeClient())))
     store = create_store({"SUPABASE_URL": "https://x.supabase.co", "SUPABASE_KEY": "k"}.get, tmp_path)
     assert isinstance(store, SupabaseClubStore)
+
+
+def test_normalize_url():
+    from club_agent.supabase_store import normalize_url
+
+    assert normalize_url(" https://abc.supabase.co/rest/v1/ ") == "https://abc.supabase.co"
+    assert normalize_url("https://abc.supabase.co") == "https://abc.supabase.co"
