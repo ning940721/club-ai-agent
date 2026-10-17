@@ -50,6 +50,13 @@
 - 社長：一鍵產生各部門進度彙整與下次會議議程。
 - 帳號可變更密碼；網頁程式拆分為 web/ 下的多個頁面檔。
 
+## 2026-10-17｜v0.29.0 可改用 Claude
+
+- 網站可選擇 AI 供應商：Secrets 有 ANTHROPIC_API_KEY 時改用 Claude（AI_PROVIDER = "gemini" 可強制改回），模型以 CLAUDE_MODEL 設定，預設 claude-opus-5-5。
+- ClaudeLLM 改寫：結構化輸出（client.beta.messages.parse + output_format）、effort 控制思考程度（預設 medium，問答類 low）、
+  伺服器端 refusal fallback（fallbacks="default"），錯誤（金鑰、餘額不足、速率上限、忙碌）轉成中文說明。
+- 測試環境清除 ANTHROPIC_API_KEY 等設定，避免測試呼叫真的 API；以假的用戶端測試送出的參數與錯誤訊息。
+
 ## 2026-10-16｜v0.28.3 搬上 Supabase
 
 - 實際連上 Supabase：資料表與 club-files 檔案空間建立完成，本機資料（1 個社團、12 筆資料、6 筆分享的成果、1 個檔案）搬移後逐項比對一致。

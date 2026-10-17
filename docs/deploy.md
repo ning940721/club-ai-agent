@@ -60,6 +60,18 @@
 4. 按「Deploy」，第一次安裝約需 3–5 分鐘，完成後就會看到登入頁，網址列就是要分享給幹部的網址。
 5. 確認：登入頁下方顯示「**資料存放：線上資料庫**」，用原本的社團帳號密碼登入，資料都在。
 
+## 改用 Claude（選用）
+
+1. 到 **console.anthropic.com** 註冊 → **Billing** 儲值（預付制，可設定每月上限）→ **API Keys** → Create Key，複製金鑰。
+2. 在網站的 Secrets（以及電腦上的 `.streamlit/secrets.toml`，如果也想在電腦上用）加上：
+   ```toml
+   ANTHROPIC_API_KEY = "sk-ant-..."
+   CLAUDE_MODEL = "claude-opus-5-5"
+   ```
+   有 `ANTHROPIC_API_KEY` 時網站會自動改用 Claude；想改回 Gemini，加上 `AI_PROVIDER = "gemini"` 或刪掉 Claude 金鑰即可。
+3. 模型選擇：`claude-opus-5-5`（品質最好，預設）、`claude-sonnet-5-5`（較快、價格約一半）、`claude-haiku-5-5`（最快、最便宜）。
+   `CLAUDE_EFFORT` 可設 `low`／`medium`／`high`，越低越快；問答類工作固定用 `low`。
+
 ## 之後怎麼更新
 
 - 程式推送到 GitHub 的同一個分支後，網站會自動重新部署，不用重做上面的步驟。

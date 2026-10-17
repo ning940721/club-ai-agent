@@ -829,3 +829,24 @@ def test_library_preview():
     at.button(key=f"lib_pv_{sheet.id}").click().run()
     assert not at.exception
     assert any("海報" in str(d.value.values.tolist()) for d in at.dataframe)
+
+
+def test_claude_is_used_when_anthropic_key_is_set(monkeypatch):
+    from club_agent.llm import ClaudeLLM
+
+    seen = []
+
+    def fake(self, system, user, output_type):
+        seen.append((self.model, self.effort))
+        return MeetingAnswer(found=True, answer="Claude 回答", sources=[])
+
+    monkeypatch.setattr(ClaudeLLM, "structured", fake)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-claude-key")
+    monkeypatch.setenv("CLAUDE_MODEL", "claude-sonnet-5-5")
+    at = _app()
+    _signup(at)
+    _open(at, "feed")
+    _button(at, "下次發文時間是什麼時候？").click().run()
+    assert not at.exception
+    assert any("Claude 回答" in m.value for m in at.markdown)
+    assert seen == [("claude-sonnet-5-5", "low")]  # 問答用最低思考程度

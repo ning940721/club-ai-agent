@@ -22,9 +22,9 @@ EXAMPLES = Path(__file__).parent.parent / "examples"
 
 @pytest.fixture(autouse=True)
 def _isolate_from_real_services(monkeypatch):
-    """網頁測試不讀 .streamlit/secrets.toml：不會連到真正的線上資料庫，也不會用到真的 AI 金鑰。"""
+    """網頁測試不讀 .streamlit/secrets.toml，也清掉環境中的 Claude／Supabase 設定：不會連到真正的資料庫或呼叫真的 AI。"""
     monkeypatch.setenv("CLUB_AGENT_TESTING", "1")
-    for name in ("SUPABASE_URL", "SUPABASE_KEY"):
+    for name in ("SUPABASE_URL", "SUPABASE_KEY", "ANTHROPIC_API_KEY", "AI_PROVIDER", "CLAUDE_MODEL", "CLAUDE_EFFORT"):
         monkeypatch.delenv(name, raising=False)
 
 

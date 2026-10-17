@@ -89,7 +89,10 @@ def show_secrets_error() -> None:
         )
 
 
-API_KEY = secret("GEMINI_API_KEY") or secret("GOOGLE_API_KEY")
+# AI 供應商：有 ANTHROPIC_API_KEY 時用 Claude（可用 AI_PROVIDER = "gemini" 強制改回 Gemini），否則用 Gemini
+ANTHROPIC_KEY = secret("ANTHROPIC_API_KEY")
+PROVIDER = "claude" if ANTHROPIC_KEY and (secret("AI_PROVIDER") or "claude").lower() != "gemini" else "gemini"
+API_KEY = ANTHROPIC_KEY if PROVIDER == "claude" else (secret("GEMINI_API_KEY") or secret("GOOGLE_API_KEY"))
 SIGNUP_CODE = secret("SIGNUP_CODE")  # 設定後，建立新社團帳號需要輸入這組邀請碼
 
 
@@ -213,9 +216,11 @@ ctx = AppContext(
     settings=settings,
     dept_key=dept_key,
     api_key=API_KEY,
-    model=secret("GEMINI_MODEL"),
+    model=secret("CLAUDE_MODEL") if PROVIDER == "claude" else secret("GEMINI_MODEL"),
     max_runs=int(secret("MAX_RUNS_PER_SESSION", "20")),
     thinking=secret("GEMINI_THINKING"),
+    provider=PROVIDER,
+    effort=secret("CLAUDE_EFFORT"),
 )
 features = settings.features(dept_key)  # 社團自訂的分工
 
@@ -231,7 +236,7 @@ page_header(ctx.dept_name, club.name, beta=ctx.dept.beta)
 if not API_KEY:
     show_secrets_error()
     if not SECRETS_ERROR:
-        st.error("網站尚未設定 GEMINI_API_KEY，請管理者到 Secrets 設定（見 docs/deploy.md）。")
+        st.error("網站尚未設定 AI 金鑰（ANTHROPIC_API_KEY 或 GEMINI_API_KEY），請管理者到 Secrets 設定（見 docs/deploy.md）。")
 dept_task_strip(ctx, lambda: open_side_page("tasks"))  # 每個部門一進來就看到自己的待辦
 
 # 各部門的功能直接列在上方分頁；部門顧問放最後。待辦、AI Agent 問答、行事曆、報帳在側邊欄「幹部共用」。

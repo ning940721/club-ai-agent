@@ -13,7 +13,7 @@ from streamlit.runtime.scriptrunner import add_script_run_ctx, get_script_run_ct
 
 from ..departments import ClubSettings, Department
 from ..export import pdf_available, to_docx, to_pdf
-from ..llm import GeminiLLM, LLMError
+from ..llm import LLM, THINKING_TO_EFFORT, ClaudeLLM, GeminiLLM, LLMError
 from ..schemas import ClubProfile
 from ..store import ClubStore, Record
 
@@ -57,6 +57,8 @@ class AppContext:
     model: str | None
     max_runs: int
     thinking: str | None = None
+    provider: str = "gemini"  # gemini 或 claude
+    effort: str | None = None  # Claude 的預設思考程度
 
     @property
     def dept(self) -> Department:
@@ -66,15 +68,20 @@ class AppContext:
     def dept_name(self) -> str:
         return self.settings.name(self.dept_key)
 
-    def make_llm(self, status, thinking: str | None = None) -> GeminiLLM:
-        from google import genai
-
+    def make_llm(self, status, thinking: str | None = None) -> LLM:
         script_ctx = get_script_run_ctx()
 
         def notify(message: str) -> None:
             # 分段摘要會在背景執行緒呼叫 AI，需要綁定頁面才能顯示進度訊息
             add_script_run_ctx(threading.current_thread(), script_ctx)
             status.write(message)
+
+        if self.provider == "claude":
+            # 問答等指定較低思考程度的工作用 low，其餘用網站設定（預設 medium）
+            effort = THINKING_TO_EFFORT.get(thinking or "", self.effort)
+            return ClaudeLLM(model=self.model, api_key=self.api_key, effort=effort, notify=notify)
+
+        from google import genai
 
         return GeminiLLM(
             model=self.model, client=genai.Client(api_key=self.api_key), notify=notify, thinking=thinking or self.thinking
@@ -89,14 +96,14 @@ class AppContext:
         return True
 
     def run_ai(
-        self, label: str, fn: Callable[[GeminiLLM, Any], Any], done_label: str = "完成", thinking: str | None = None
+        self, label: str, fn: Callable[[LLM, Any], Any], done_label: str = "完成", thinking: str | None = None
     ) -> Any | None:
         """呼叫 AI 並顯示進度；失敗時顯示錯誤並回傳 None。fn 會收到 (llm, status)。
 
         thinking：這項工作的思考程度（minimal 最快）；不指定時用網站設定（預設 low）。
         """
         if not self.api_key:
-            st.error("尚未設定 GEMINI_API_KEY，請管理者到 Secrets 設定。")
+            st.error("尚未設定 AI 金鑰（ANTHROPIC_API_KEY 或 GEMINI_API_KEY），請管理者到 Secrets 設定。")
             return None
         if not self.check_quota():
             return None

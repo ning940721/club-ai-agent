@@ -25,7 +25,7 @@ T = TypeVar("T", bound=BaseModel)
 DEFAULT_PROVIDER = "gemini"
 DEFAULT_MODELS = {
     "gemini": "gemini-flash-latest",
-    "claude": "claude-opus-5",
+    "claude": "claude-opus-5-5",
 }
 # 備用模型依序嘗試；已下架或不開放的模型（404）會自動略過
 DEFAULT_GEMINI_THINKING = "low"
@@ -209,40 +209,75 @@ class GeminiLLM:
             raise LLMError(f"模型輸出不符合格式：{e}") from e
 
 
+# 網頁上的「思考程度」（沿用 Gemini 的說法）對應到 Claude 的 effort
+THINKING_TO_EFFORT = {"minimal": "low", "low": "low", "medium": "medium", "high": "high"}
+
+
 class ClaudeLLM:
     """以 Claude 結構化輸出（Structured Outputs）產生符合 schema 的結果。
 
-    - 使用 adaptive thinking，讓模型自行決定推理深度。
-    - 啟用伺服器端 refusal fallback：若請求被安全分類器拒絕，
-      API 會自動改由備援模型重跑，避免流程中斷。
+    - 預設模型 Claude Opus 5.5（可用 CLAUDE_MODEL 改成 claude-sonnet-5-5、claude-haiku-5-5 等）。
+    - 思考程度用 effort 控制：low 最快、medium 為預設、high 最仔細；問答類工作用 low。
+    - 啟用伺服器端 refusal fallback（fallbacks="default"）：請求被安全分類器拒絕時，
+      API 會自動改由 Anthropic 建議的備援模型重跑，避免流程中斷。
+    - 429／5xx 由 SDK 自動重試；錯誤轉成中文說明（LLMError）。
     """
 
-    def __init__(self, model: str | None = None, max_tokens: int = 16000, effort: str = "high", client=None):
+    def __init__(
+        self,
+        model: str | None = None,
+        max_tokens: int = 16000,
+        effort: str | None = None,
+        client=None,
+        api_key: str | None = None,
+        notify: Callable[[str], None] | None = None,
+    ):
         import anthropic
 
         self.model = _model_from_env("claude", model)
         self.max_tokens = max_tokens
-        self.effort = effort
-        self.client = client or anthropic.Anthropic()
+        self.effort = (effort or os.environ.get("CLUB_AGENT_EFFORT") or "medium").lower()
+        self.client = client or anthropic.Anthropic(api_key=api_key, max_retries=3)
+        self.notify = notify or (lambda msg: print(f"… {msg}", file=sys.stderr))
 
     def structured(self, system: str, user: str, output_type: type[T]) -> T:
-        response = self.client.beta.messages.parse(
-            model=self.model,
-            max_tokens=self.max_tokens,
-            system=system,
-            messages=[{"role": "user", "content": user}],
-            thinking={"type": "adaptive"},
-            output_config={"effort": self.effort},
-            output_format=output_type,
-            betas=["server-side-fallback-2026-07-01"],
-            fallbacks="default",
-        )
+        import anthropic
+
+        try:
+            response = self.client.beta.messages.parse(
+                model=self.model,
+                max_tokens=self.max_tokens,
+                system=system,
+                messages=[{"role": "user", "content": user}],
+                output_config={"effort": self.effort},
+                output_format=output_type,
+                betas=["server-side-fallback-2026-07-01"],
+                fallbacks="default",
+            )
+        except anthropic.AuthenticationError as e:
+            raise LLMError("Claude 金鑰無效，請到 Secrets 確認 ANTHROPIC_API_KEY 是否正確。") from e
+        except anthropic.PermissionDeniedError as e:
+            raise LLMError("這組 Claude 金鑰沒有使用這個模型的權限，請到 console.anthropic.com 確認。") from e
+        except anthropic.NotFoundError as e:
+            raise LLMError(f"找不到模型 {self.model}，請確認 CLAUDE_MODEL 的名稱。") from e
+        except anthropic.RateLimitError as e:
+            raise LLMError("短時間內呼叫太多次，超過 Claude 帳戶的速率上限，請等 1 分鐘再試。") from e
+        except anthropic.BadRequestError as e:
+            message = str(getattr(e, "message", e))
+            if "credit balance" in message.lower():
+                raise LLMError("Claude 帳戶的餘額不足，請到 console.anthropic.com → Billing 儲值後再試。") from e
+            raise LLMError(f"Claude API 錯誤：{message}") from e
+        except (anthropic.APIConnectionError, anthropic.APITimeoutError) as e:
+            raise LLMError("連不上 Claude，請檢查網路後再試一次。") from e
+        except anthropic.APIStatusError as e:
+            raise LLMError(f"Claude 目前忙碌（{e.status_code}），請稍後再試。") from e
+
         if response.stop_reason == "refusal":
-            raise LLMError(f"模型拒絕回應：{response.stop_details}")
+            raise LLMError("AI 判斷這個請求可能不適合回答，請換個說法再試一次。")
         if response.stop_reason == "max_tokens":
-            raise LLMError("輸出超過 max_tokens 上限，請調高 max_tokens 或縮小需求範圍")
+            raise LLMError("AI 的回答太長被截斷了，請把需求寫得精簡一點再試一次")
         if response.parsed_output is None:
-            raise LLMError(f"無法解析模型輸出（stop_reason={response.stop_reason}）")
+            raise LLMError(f"無法解析 AI 的輸出（stop_reason={response.stop_reason}）")
         return response.parsed_output
 
 
