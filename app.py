@@ -32,6 +32,7 @@ from club_agent.departments import (  # noqa: E402
     FEATURE_VENUE,
     ClubSettings,
 )
+from club_agent.llm import DEFAULT_MODELS  # noqa: E402
 from club_agent.store import StoreError, create_store  # noqa: E402
 from club_agent.web.calendar_pages import calendar_page  # noqa: E402
 from club_agent.web.course_pages import course_tabs  # noqa: E402
@@ -93,6 +94,8 @@ def show_secrets_error() -> None:
 ANTHROPIC_KEY = secret("ANTHROPIC_API_KEY")
 PROVIDER = "claude" if ANTHROPIC_KEY and (secret("AI_PROVIDER") or "claude").lower() != "gemini" else "gemini"
 API_KEY = ANTHROPIC_KEY if PROVIDER == "claude" else (secret("GEMINI_API_KEY") or secret("GOOGLE_API_KEY"))
+AI_MODEL = secret("CLAUDE_MODEL") if PROVIDER == "claude" else secret("GEMINI_MODEL")
+AI_LABEL = f"AI：{'Claude' if PROVIDER == 'claude' else 'Gemini'}（{AI_MODEL or DEFAULT_MODELS[PROVIDER]}）"
 SIGNUP_CODE = secret("SIGNUP_CODE")  # 設定後，建立新社團帳號需要輸入這組邀請碼
 
 
@@ -216,7 +219,7 @@ ctx = AppContext(
     settings=settings,
     dept_key=dept_key,
     api_key=API_KEY,
-    model=secret("CLAUDE_MODEL") if PROVIDER == "claude" else secret("GEMINI_MODEL"),
+    model=AI_MODEL,
     max_runs=int(secret("MAX_RUNS_PER_SESSION", "20")),
     thinking=secret("GEMINI_THINKING"),
     provider=PROVIDER,
@@ -229,7 +232,7 @@ if (side_page := st.session_state.get("side_page")) in SIDE_PAGES:
     page_header(label, club.name)
     st.button("返回部門功能", icon=":material/arrow_back:", on_click=open_side_page, args=(None,))
     render(ctx)
-    usage_slot.caption(f"本次已使用 {st.session_state.get('runs', 0)} / {ctx.max_runs} 次")
+    usage_slot.caption(f"本次已使用 {st.session_state.get('runs', 0)} / {ctx.max_runs} 次｜{AI_LABEL}")
     st.stop()
 
 page_header(ctx.dept_name, club.name, beta=ctx.dept.beta)
@@ -269,4 +272,4 @@ for tab, (_, render) in zip(st.tabs([name for name, _ in pages]), pages):
     with tab:
         render()
 
-usage_slot.caption(f"本次已使用 {st.session_state.get('runs', 0)} / {ctx.max_runs} 次")
+usage_slot.caption(f"本次已使用 {st.session_state.get('runs', 0)} / {ctx.max_runs} 次｜{AI_LABEL}")
