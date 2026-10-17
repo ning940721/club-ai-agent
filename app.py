@@ -65,14 +65,28 @@ st.set_page_config(page_title="社團營運平台", page_icon=":material/groups:
 inject_css()
 
 
+SECRETS_ERROR: list[str] = []  # Secrets 格式錯誤時的訊息（只有位置與原因，不含金鑰內容）
+
+
 def secret(name: str, default: str | None = None) -> str | None:
     value = None
     if not os.environ.get("CLUB_AGENT_TESTING"):  # 自動測試時不讀 secrets.toml，避免連到真正的資料庫或 AI
         try:
             value = st.secrets.get(name)
-        except Exception:  # 本機沒有 secrets.toml 時
-            value = None
+        except Exception as e:  # 沒有 secrets 時當成沒設定；格式錯誤時記下原因，顯示給管理者
+            message = str(e)
+            if "pars" in message.lower() and not SECRETS_ERROR:
+                SECRETS_ERROR.append(message.split(": ", 1)[-1] if "secrets.toml" in message else message)
     return value or os.environ.get(name, default)
+
+
+def show_secrets_error() -> None:
+    if SECRETS_ERROR:
+        st.error(
+            "Secrets 的格式有誤，所以讀不到任何設定（金鑰、資料庫）。請管理者到 Manage app → Settings → Secrets 檢查："
+            "欄位名稱要用底線（例如 GEMINI_API_KEY，不能有空格）、等號右邊的值要用英文雙引號包起來。"
+            f"\n\n錯誤位置：{SECRETS_ERROR[0]}"
+        )
 
 
 API_KEY = secret("GEMINI_API_KEY") or secret("GOOGLE_API_KEY")
@@ -136,6 +150,7 @@ if "club_id" not in st.session_state:
                         st.rerun()
                     except StoreError as e:
                         st.error(str(e))
+        show_secrets_error()
         st.caption("資料存放：線上資料庫" if ONLINE_DB else "資料存放：這台電腦（data 資料夾）")
     st.stop()
 
@@ -214,7 +229,9 @@ if (side_page := st.session_state.get("side_page")) in SIDE_PAGES:
 
 page_header(ctx.dept_name, club.name, beta=ctx.dept.beta)
 if not API_KEY:
-    st.error("網站尚未設定 GEMINI_API_KEY，請管理者到 Secrets 設定（見 docs/deploy.md）。")
+    show_secrets_error()
+    if not SECRETS_ERROR:
+        st.error("網站尚未設定 GEMINI_API_KEY，請管理者到 Secrets 設定（見 docs/deploy.md）。")
 dept_task_strip(ctx, lambda: open_side_page("tasks"))  # 每個部門一進來就看到自己的待辦
 
 # 各部門的功能直接列在上方分頁；部門顧問放最後。待辦、AI Agent 問答、行事曆、報帳在側邊欄「幹部共用」。
