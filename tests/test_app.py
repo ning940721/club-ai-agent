@@ -184,6 +184,7 @@ def test_settings_and_help_live_in_sidebar():
     assert "社團設定" not in [t.label for t in at.tabs]
     at.button(key="side_help").click().run()
     assert "使用說明" in _page_title(at)
+    assert any("系統管理者可以從資料庫後台看到所有資料" in m.value for m in at.markdown)
     _button(at, "返回部門功能").click().run()
     assert "社長" in _page_title(at)
 
@@ -850,3 +851,8 @@ def test_claude_is_used_when_anthropic_key_is_set(monkeypatch):
     assert not at.exception
     assert any("Claude 回答" in m.value for m in at.markdown)
     assert seen == [("claude-sonnet-5-5", "low")]  # 問答用最低思考程度
+
+
+def test_login_page_explains_privacy():
+    at = _app()
+    assert any("請不要上傳的資料" in m.value for m in at.markdown)

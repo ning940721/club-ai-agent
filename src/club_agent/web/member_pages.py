@@ -73,6 +73,7 @@ def roster_tab(ctx: AppContext, members: list[Member]) -> None:
         col.metric(label, value)
 
     with st.expander("從 CSV 匯入名單（例如社博報名表、Google 表單回覆）"):
+        st.caption("只匯入必要欄位（例如姓名、系級、職位、Email）；身分證字號、地址、銀行帳號等敏感個資請先從檔案刪除。")
         uploaded = st.file_uploader("上傳 CSV（只有姓名必填，其他欄位會自動對應）", type="csv", key="member_import")
         if uploaded is not None:
             try:

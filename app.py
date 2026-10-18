@@ -45,6 +45,7 @@ from club_agent.web.common_pages import (  # noqa: E402
     dept_task_strip,
     feed_page,
     help_page,
+    privacy_notice,
     profile_form,
     settings_page,
     tasks_page,
@@ -158,6 +159,7 @@ if "club_id" not in st.session_state:
                         st.error(str(e))
         show_secrets_error()
         st.caption("資料存放：線上資料庫" if ONLINE_DB else "資料存放：這台電腦（data 資料夾）")
+        privacy_notice(PROVIDER)
     st.stop()
 
 
@@ -183,7 +185,7 @@ SHARED_PAGES = {
 }
 OTHER_PAGES = {
     "settings": ("社團設定", ":material/settings:", settings_page),
-    "help": ("使用說明", ":material/help:", lambda _ctx: help_page()),
+    "help": ("使用說明", ":material/help:", lambda ctx: help_page(ctx.provider)),
 }
 SIDE_PAGES = {**SHARED_PAGES, **OTHER_PAGES}
 

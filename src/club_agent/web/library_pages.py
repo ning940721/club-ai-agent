@@ -54,6 +54,7 @@ def library_page(ctx: AppContext) -> None:
 def upload_form(ctx: AppContext) -> None:
     with st.expander("上傳檔案", expanded=False, icon=":material/upload_file:"):
         with st.form("library_upload", clear_on_submit=True, border=False):
+            st.caption("請勿上傳含身分證字號、銀行帳號等敏感個資的檔案；有個資的收據或文件請先遮蔽。管理者可從資料庫後台看到所有資料，詳見「使用說明」的資料與隱私。")
             uploads = st.file_uploader("選擇檔案（可以一次選多個，每個最多 20 MB）", accept_multiple_files=True)
             c1, c2, c3 = st.columns(3)
             departments = ctx.settings.enabled_keys()

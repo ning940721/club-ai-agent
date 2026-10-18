@@ -403,6 +403,7 @@ def settings_page(ctx: AppContext) -> None:
             except StoreError as e:
                 st.error(str(e))
     with tab_account:
+        privacy_notice(ctx.provider)
         with st.form("change_password"):
             old = st.text_input("目前的密碼", type="password")
             new = st.text_input("新密碼（至少 6 個字元）", type="password")
@@ -419,11 +420,51 @@ def settings_page(ctx: AppContext) -> None:
 
 
 # ---------------------------------------------------------------------------
+# 資料與隱私
+# ---------------------------------------------------------------------------
+
+AI_PRIVACY = {
+    "claude": "AI 功能由 Anthropic Claude 提供；依其 API 商業條款，傳送的內容預設不會被用來訓練模型。",
+    "gemini": "AI 功能由 Google Gemini 提供；免費方案傳送的內容可能被 Google 用於改善服務。",
+}
+
+
+def privacy_markdown(provider: str = "claude") -> str:
+    return f"""
+**資料存放在哪裡**
+- 所有資料（會議記錄、待辦、報帳、上傳的檔案、AI 產生的結果）存放在雲端資料庫 Supabase，檔案空間為私人，沒有公開網址。
+- 只有登入本社團帳號的人看得到本社團的資料，其他社團與外部的人都看不到。
+
+**誰看得到**
+- 社團帳號是全體幹部共用的，登入的人都能看到各部門分享的內容與文件庫。
+- 財務資料以財務密碼上鎖，網站上只有財務與社長看得到。
+- **系統管理者可以從資料庫後台看到所有資料（包含財務資料）**。管理者僅在系統維護或故障排除時進入後台，不會主動查看或對外提供社團資料。
+
+**AI 會讀到什麼**
+- 使用 AI 功能時，相關內容（例如會議記錄、問題、上傳的文件）會傳送給 AI 服務處理。{AI_PRIVACY.get(provider, AI_PRIVACY["claude"])}
+
+**請不要上傳的資料**
+- 身分證字號、銀行或轉帳帳號、密碼、病歷等敏感個資。
+- 社員名單只填必要欄位（例如姓名、系級、職位）；收據或文件上若有個資，請先遮蔽再上傳。
+- 轉帳帳號請私下提供給財務，不要寫在系統裡。
+
+**帳號安全**
+- 每屆交接時請更改社團密碼與財務密碼；密碼只告訴現任幹部。
+"""
+
+
+def privacy_notice(provider: str = "claude", expanded: bool = False) -> None:
+    with st.expander("資料與隱私說明", icon=":material/lock:", expanded=expanded):
+        st.markdown(privacy_markdown(provider))
+
+
+# ---------------------------------------------------------------------------
 # 使用說明
 # ---------------------------------------------------------------------------
 
 
-def help_page() -> None:
+def help_page(provider: str = "claude") -> None:
+    st.markdown("### 資料與隱私" + privacy_markdown(provider))
     st.markdown(
         """
 ### 怎麼使用

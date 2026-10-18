@@ -88,6 +88,7 @@ def add_section(ctx: AppContext) -> None:
     meeting_date = c2.date_input("日期", value=date.today(), key="m_date")
     title = c3.text_input("標題", placeholder="例：第 5 次幹部會、成果展籌備群組", key="m_title")
     uploaded = st.file_uploader("上傳檔案（.txt／.md／.docx／.pdf；LINE 請用「傳送聊天記錄」匯出的 .txt）", type=["txt", "md", "docx", "pdf"], key="m_file")
+    st.caption("上傳的內容會傳送給 AI 整理重點；LINE 對話若有與會議無關的私人內容，建議先刪除再上傳。")
     pasted = st.text_area("或直接貼上內容", height=200, key="m_text")
     plan_id = plan_picker(ctx, meeting_date)
 
