@@ -856,3 +856,22 @@ def test_claude_is_used_when_anthropic_key_is_set(monkeypatch):
 def test_login_page_explains_privacy():
     at = _app()
     assert any("請不要上傳的資料" in m.value for m in at.markdown)
+
+
+def test_monthly_ai_limit_is_shared_by_the_club(monkeypatch):
+    monkeypatch.setenv("MONTHLY_AI_LIMIT", "1")
+    at = _app()
+    _signup(at)
+    _switch(at, "finance")
+    _input(at, "你的問題").input("成果展預算怎麼分配？")
+    _button(at, "取得建議").click().run()
+    assert any("先做預算表" in m.value for m in at.markdown)
+    assert any("本社團本月 AI 使用 1 / 1 次" in c.value for c in at.caption)
+    _button(at, "取得建議").click().run()
+    assert any("本月的 AI 使用次數已達 1 次上限" in w.value for w in at.warning)
+    # 重新整理（新的瀏覽階段）也不會歸零
+    at2 = st_testing.AppTest.from_file(APP, default_timeout=30).run()
+    at2.text_input[0].input("test-club")
+    at2.text_input[1].input("secret123")
+    at2.button[0].click().run()
+    assert any("本社團本月 AI 使用 1 / 1 次" in c.value for c in at2.caption)

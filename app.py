@@ -34,6 +34,7 @@ from club_agent.departments import (  # noqa: E402
 )
 from club_agent.llm import DEFAULT_MODELS  # noqa: E402
 from club_agent.store import StoreError, create_store  # noqa: E402
+from club_agent.usage import DEFAULT_MONTHLY_LIMIT  # noqa: E402
 from club_agent.web.calendar_pages import calendar_page  # noqa: E402
 from club_agent.web.course_pages import course_tabs  # noqa: E402
 from club_agent.web.design_pages import design_tabs  # noqa: E402
@@ -226,6 +227,7 @@ ctx = AppContext(
     thinking=secret("GEMINI_THINKING"),
     provider=PROVIDER,
     effort=secret("CLAUDE_EFFORT"),
+    monthly_limit=int(secret("MONTHLY_AI_LIMIT", str(DEFAULT_MONTHLY_LIMIT))),
 )
 features = settings.features(dept_key)  # 社團自訂的分工
 
@@ -234,7 +236,7 @@ if (side_page := st.session_state.get("side_page")) in SIDE_PAGES:
     page_header(label, club.name)
     st.button("返回部門功能", icon=":material/arrow_back:", on_click=open_side_page, args=(None,))
     render(ctx)
-    usage_slot.caption(f"本次已使用 {st.session_state.get('runs', 0)} / {ctx.max_runs} 次｜{AI_LABEL}")
+    usage_slot.caption(f"本社團本月 AI 使用 {ctx.monthly_used()} / {ctx.monthly_limit} 次｜{AI_LABEL}")
     st.stop()
 
 page_header(ctx.dept_name, club.name, beta=ctx.dept.beta)
@@ -274,4 +276,4 @@ for tab, (_, render) in zip(st.tabs([name for name, _ in pages]), pages):
     with tab:
         render()
 
-usage_slot.caption(f"本次已使用 {st.session_state.get('runs', 0)} / {ctx.max_runs} 次｜{AI_LABEL}")
+usage_slot.caption(f"本社團本月 AI 使用 {ctx.monthly_used()} / {ctx.monthly_limit} 次｜{AI_LABEL}")

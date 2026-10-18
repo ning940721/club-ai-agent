@@ -306,9 +306,9 @@ def handover_pack_page(ctx: AppContext) -> None:
     if with_manuals:
         keys = ctx.settings.enabled_keys()
         chosen = st.multiselect("要產生交接手冊的部門", keys, default=keys, format_func=ctx.settings.name, key="pack_depts")
-        remaining = ctx.max_runs - st.session_state.get("runs", 0)
+        remaining = ctx.remaining_runs()
         if len(chosen) > remaining:
-            st.warning(f"這次登入只剩 {remaining} 次 AI 使用額度，請減少部門數量，或重新整理頁面後再試。")
+            st.warning(f"目前只剩 {remaining} 次 AI 使用額度，請減少部門數量。")
     if st.button("整理交接資料包", type="primary", key="pack_go"):
         manuals = {}
         for key in chosen:

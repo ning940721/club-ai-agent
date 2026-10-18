@@ -16,6 +16,7 @@ from ..export import pdf_available, to_docx, to_pdf
 from ..llm import LLM, THINKING_TO_EFFORT, ClaudeLLM, GeminiLLM, LLMError
 from ..schemas import ClubProfile
 from ..store import ClubStore, Record
+from ..usage import DEFAULT_MONTHLY_LIMIT, add_usage, monthly_usage
 
 
 DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -59,6 +60,7 @@ class AppContext:
     thinking: str | None = None
     provider: str = "gemini"  # gemini 或 claude
     effort: str | None = None  # Claude 的預設思考程度
+    monthly_limit: int = DEFAULT_MONTHLY_LIMIT  # 每個社團每月可用的 AI 次數（全體幹部共用）
 
     @property
     def dept(self) -> Department:
@@ -87,12 +89,23 @@ class AppContext:
             model=self.model, client=genai.Client(api_key=self.api_key), notify=notify, thinking=thinking or self.thinking
         )
 
+    def monthly_used(self) -> int:
+        return monthly_usage(self.store, self.club_id)
+
+    def remaining_runs(self) -> int:
+        """這次登入還能用幾次 AI：取每月額度與單次上限中較少的一個。"""
+        return max(0, min(self.monthly_limit - self.monthly_used(), self.max_runs - st.session_state.get("runs", 0)))
+
     def check_quota(self) -> bool:
+        if self.monthly_used() >= self.monthly_limit:
+            st.warning(f"本社團本月的 AI 使用次數已達 {self.monthly_limit} 次上限，下個月 1 日會自動恢復；如需增加請聯絡系統管理者。")
+            return False
         used = st.session_state.get("runs", 0)
         if used >= self.max_runs:
             st.warning(f"本次使用已達 {self.max_runs} 次上限，請重新整理頁面或稍後再試。")
             return False
         st.session_state.runs = used + 1
+        add_usage(self.store, self.club_id)
         return True
 
     def run_ai(
