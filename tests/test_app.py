@@ -239,7 +239,7 @@ def test_marketing_tools_flow():
     _button(at, "開始診斷").click().run()
     assert not at.exception
     assert any("流量瓶頸" in m.value for m in at.markdown)
-    assert "1 / 20" in " ".join(c.value for c in at.caption)
+    assert "AI 使用 1 / 200 次" in " ".join(m.value for m in at.markdown)
     assert "產生宣傳企劃" not in [b.label for b in at.button]  # 活動宣傳企劃已從網頁拿掉
 
 
@@ -866,7 +866,7 @@ def test_monthly_ai_limit_is_shared_by_the_club(monkeypatch):
     _input(at, "你的問題").input("成果展預算怎麼分配？")
     _button(at, "取得建議").click().run()
     assert any("先做預算表" in m.value for m in at.markdown)
-    assert any("本社團本月 AI 使用 1 / 1 次" in c.value for c in at.caption)
+    assert any("本社團本月 AI 使用 1 / 1 次" in c.value for c in at.markdown)
     _button(at, "取得建議").click().run()
     assert any("本月的 AI 使用次數已達 1 次上限" in w.value for w in at.warning)
     # 重新整理（新的瀏覽階段）也不會歸零
@@ -874,4 +874,4 @@ def test_monthly_ai_limit_is_shared_by_the_club(monkeypatch):
     at2.text_input[0].input("test-club")
     at2.text_input[1].input("secret123")
     at2.button[0].click().run()
-    assert any("本社團本月 AI 使用 1 / 1 次" in c.value for c in at2.caption)
+    assert any("本社團本月 AI 使用 1 / 1 次" in c.value for c in at2.markdown)

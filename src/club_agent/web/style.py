@@ -47,6 +47,22 @@ table.cal td.cal-today { box-shadow: inset 0 0 0 2px #2D4A6B; }
 .ev-other { background: #ECEAE4; color: #4B5160; }
 .cal-more { font-size: 0.7rem; color: #6B7280; }
 div[data-testid="stExpander"] details { border-color: #E2DED6; }
+
+/* 側邊欄選單：文字靠左，像導覽列 */
+section[data-testid="stSidebar"] .stButton button { justify-content: flex-start; padding-left: 0.75rem; }
+section[data-testid="stSidebar"] .stButton button > div { justify-content: flex-start; }
+.app-usage { font-size: 0.8rem; color: #6B7280; line-height: 1.6; margin-top: 0.35rem; }
+.app-usage-bar { height: 4px; background: #E2DED6; border-radius: 999px; overflow: hidden; margin: 0.15rem 0 0.25rem 0; }
+.app-usage-bar > div { height: 100%; background: #2D4A6B; }
+.app-usage-bar > div.warn { background: #B4532A; }
+
+/* 手機：側邊欄收起時，展開按鈕加上「選單」文字，幹部才找得到部門切換與共用功能 */
+[data-testid="stExpandSidebarButton"], [data-testid="stSidebarCollapsedControl"] button {
+  border: 1px solid #D6D2C8; border-radius: 999px; background: #FFFFFF; padding: 0.15rem 0.7rem 0.15rem 0.45rem;
+}
+[data-testid="stExpandSidebarButton"]::after, [data-testid="stSidebarCollapsedControl"] button::after {
+  content: "選單"; font-size: 0.85rem; color: #1D2433; margin-left: 0.15rem;
+}
 </style>
 """
 
@@ -70,3 +86,14 @@ def sidebar_brand(club_name: str) -> None:
 
 def note(text: str) -> None:
     st.markdown(f'<div class="section-note">{html.escape(text)}</div>', unsafe_allow_html=True)
+
+
+def usage_meter(used: int, limit: int, ai_label: str) -> str:
+    """側邊欄的本月 AI 使用量（含進度條）。回傳 HTML，由呼叫端放進預留的位置。"""
+    ratio = min(1.0, used / limit) if limit else 1.0
+    warn = " warn" if ratio >= 0.8 else ""
+    return (
+        f'<div class="app-usage">本社團本月 AI 使用 {used} / {limit} 次'
+        f'<div class="app-usage-bar"><div class="{warn.strip()}" style="width:{ratio * 100:.0f}%"></div></div>'
+        f'{html.escape(ai_label)}</div>'
+    )

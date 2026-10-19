@@ -52,7 +52,7 @@ from club_agent.web.common_pages import (  # noqa: E402
     tasks_page,
 )
 from club_agent.web.context import AppContext  # noqa: E402
-from club_agent.web.style import inject_css, page_header, sidebar_brand  # noqa: E402
+from club_agent.web.style import inject_css, page_header, sidebar_brand, usage_meter  # noqa: E402
 from club_agent.web.marketing_pages import diagnosis_page, monthly_page  # noqa: E402
 from club_agent.web.library_pages import library_page  # noqa: E402
 from club_agent.web.live_meeting_pages import live_meeting_page  # noqa: E402
@@ -236,7 +236,7 @@ if (side_page := st.session_state.get("side_page")) in SIDE_PAGES:
     page_header(label, club.name)
     st.button("返回部門功能", icon=":material/arrow_back:", on_click=open_side_page, args=(None,))
     render(ctx)
-    usage_slot.caption(f"本社團本月 AI 使用 {ctx.monthly_used()} / {ctx.monthly_limit} 次｜{AI_LABEL}")
+    usage_slot.markdown(usage_meter(ctx.monthly_used(), ctx.monthly_limit, AI_LABEL), unsafe_allow_html=True)
     st.stop()
 
 page_header(ctx.dept_name, club.name, beta=ctx.dept.beta)
@@ -276,4 +276,4 @@ for tab, (_, render) in zip(st.tabs([name for name, _ in pages]), pages):
     with tab:
         render()
 
-usage_slot.caption(f"本社團本月 AI 使用 {ctx.monthly_used()} / {ctx.monthly_limit} 次｜{AI_LABEL}")
+usage_slot.markdown(usage_meter(ctx.monthly_used(), ctx.monthly_limit, AI_LABEL), unsafe_allow_html=True)

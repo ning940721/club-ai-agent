@@ -153,7 +153,7 @@ def add_task_form(
             dept = department
         due = c4.date_input("期限（可不填）", value=None, key=f"t_due_{key}")
         status = c5.selectbox("狀態", STATUSES, key=f"t_status_{key}")
-        if st.form_submit_button("新增"):
+        if st.form_submit_button("新增", type="primary", icon=":material/add:"):
             if not title.strip():
                 st.warning("請填寫事項")
             else:
