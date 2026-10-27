@@ -1,0 +1,27 @@
+# 定時喚醒網站（Streamlit）與資料庫（Supabase），避免免費方案休眠
+name: Keep awake
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"   # 每 6 小時一次（UTC）
+  workflow_dispatch:          # 也可以在 GitHub 的 Actions 頁面手動執行
+
+jobs:
+  wake:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Playwright
+        run: |
+          pip install playwright
+          python -m playwright install --with-deps chromium
+      - name: Wake up
+        env:
+          APP_URL: ${{ vars.APP_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_PUBLIC_KEY: ${{ secrets.SUPABASE_PUBLIC_KEY }}
+        run: python scripts/keep_awake.py

@@ -1,6 +1,7 @@
 # 正式上線教學
 
-上線後會得到一個網址（例如 `https://xxx.streamlit.app`），幹部用手機或電腦打開、登入社團帳號就能使用。
+上線後會得到一個網址，幹部用手機或電腦打開、登入社團帳號就能使用。
+目前的正式網址：**<https://club-agent.streamlit.app/>**
 整個流程分三步，都是免費方案：
 
 1. **Supabase**：線上資料庫，存放社團帳號與所有資料（主機重新啟動也不會消失）
@@ -77,6 +78,21 @@
 - 程式推送到 GitHub 的同一個分支後，網站會自動重新部署，不用重做上面的步驟。
 - 要換金鑰或邀請碼：到網站右下角「Manage app」→「Settings」→「Secrets」修改後儲存。
 - 網站一段時間沒人使用會進入休眠，打開時按「Yes, get this app back up」等一分鐘即可。
+
+## 定時自動喚醒（避免休眠）
+
+專案裡的 `.github/workflows/keep-awake.yml` 會每 6 小時自動打開網站一次（休眠中就自動按喚醒按鈕），並查詢一次 Supabase，避免資料庫因一週沒人用而被暫停。推送到 GitHub 的 **main 分支**後才會開始定時執行。
+
+第一次要在 GitHub 設定（專案頁 → **Settings** → **Secrets and variables** → **Actions**）：
+
+1. **Secrets** 分頁 → New repository secret，新增兩個：
+   - `SUPABASE_URL`：和網站 Secrets 裡一樣的 Project URL
+   - `SUPABASE_PUBLIC_KEY`：Supabase **Project Settings → API Keys** 裡的 **anon** 或 **publishable** 金鑰（`sb_publishable_` 開頭）。
+     這把是公開金鑰，因為資料表有開啟 RLS，用它讀不到任何社團資料；**不要**填 service_role／secret 金鑰。
+2. （選用）**Variables** 分頁 → 新增 `APP_URL`，網址有變時填新網址；沒設定就用 `https://club-agent.streamlit.app/`。
+3. 到專案頁的 **Actions** → **Keep awake** → **Run workflow** 手動跑一次，看到綠色勾勾就完成了。
+
+注意：GitHub 專案若 **60 天沒有任何 commit**，排程會被自動停用，GitHub 會寄信通知；到 Actions 頁面按「Enable workflow」即可恢復。
 
 ## 保護資料與額度
 

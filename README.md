@@ -53,6 +53,8 @@ club-agent campaign \
 
 ## 網頁版
 
+**正式網址：<https://club-agent.streamlit.app/>**（用手機或電腦打開，登入社團帳號即可使用）
+
 給不熟悉指令的社團幹部使用，支援手機瀏覽。完整功能規劃見 **[docs/roadmap.md](docs/roadmap.md)**。
 
 - **社團帳號：** 每個社團一組帳號；建立時勾選社團有哪些部門，之後可在「社團設定」增減、改名，並填寫部門細節讓 AI 微調建議。
