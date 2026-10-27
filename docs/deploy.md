@@ -46,7 +46,7 @@
 1. 到 **share.streamlit.io** → 用 GitHub 帳號登入，同意授權存取 `club-ai-agent`。
 2. 按「Create app」→ 選擇從 GitHub 部署，填入：
    - Repository：`ning940721/club-ai-agent`
-   - Branch：`claude/planning-document-creation-76lhic`（合併到 main 之後改成 `main`）
+   - Branch：`main`
    - Main file path：`app.py`
    - App URL：可以自訂網址名稱，例如 `ntu-photo-club`
 3. 展開「Advanced settings」：
@@ -75,7 +75,8 @@
 
 ## 之後怎麼更新
 
-- 程式推送到 GitHub 的同一個分支後，網站會自動重新部署，不用重做上面的步驟。
+- 網站從 `main` 部署，程式推送到 GitHub 的 `main` 後，網站會自動重新部署，不用重做上面的步驟。
+- 更新方式：小修改（文字、設定、小錯誤）跑過測試後直接推到 `main`；大改動（新功能、資料庫結構）先開新分支，在自己電腦上試用沒問題再合併到 `main`。
 - 要換金鑰或邀請碼：到網站右下角「Manage app」→「Settings」→「Secrets」修改後儲存。
 - 網站一段時間沒人使用會進入休眠，打開時按「Yes, get this app back up」等一分鐘即可。
 
